@@ -80,10 +80,13 @@
     <ClInclude Include="Globel.hpp" />
     <ClInclude Include="Renderer.hpp" />
     <ClInclude Include="Timer.hpp" />
+    <ClInclude Include="Triangle.hpp" />
+    <ClInclude Include="Vertex.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="App.cpp" />
     <ClCompile Include="Cube.cpp" />
+    <ClCompile Include="Renderer.cpp" />
     <ClCompile Include="Timer.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -38,6 +38,7 @@ App::App(HINSTANCE hInstance)
 
 	mClientWidth = 800;
 	mClientHeight = 600;
+	renderer.setSize(mClientWidth, mClientHeight);
 }
 
 App::~App()

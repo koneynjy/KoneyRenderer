@@ -1,8 +1,7 @@
 #ifndef _APP
 #define _APP
-
-
 #include "Globel.hpp"
+#include "Renderer.hpp"
 #include "Timer.hpp"
 #include <string>
 class App
@@ -34,7 +33,7 @@ protected:
 	bool      mMinimized;
 	bool      mMaximized;
 	bool      mResizing;
-
+	Renderer  renderer;
 	Timer mTimer;
 
 	std::wstring mFrameStats;
