@@ -35,6 +35,7 @@ protected:
 	bool      mResizing;
 	Renderer  renderer;
 	Timer mTimer;
+	BITMAPINFOHEADER bitmapInfo;
 
 	std::wstring mFrameStats;
 	std::wstring mMainWndCaption;

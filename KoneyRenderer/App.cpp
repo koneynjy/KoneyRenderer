@@ -39,6 +39,17 @@ App::App(HINSTANCE hInstance)
 	mClientWidth = 800;
 	mClientHeight = 600;
 	renderer.setSize(mClientWidth, mClientHeight);
+	bitmapInfo.biSize = sizeof(BITMAPINFOHEADER);
+	bitmapInfo.biWidth = mClientWidth;
+	bitmapInfo.biHeight = mClientHeight;
+	bitmapInfo.biPlanes = 1;
+	bitmapInfo.biBitCount = 32;
+	bitmapInfo.biCompression = 0;
+	bitmapInfo.biSizeImage = 0;
+	bitmapInfo.biXPelsPerMeter = 0;
+	bitmapInfo.biYPelsPerMeter = 0;
+	bitmapInfo.biClrUsed = 0;
+	bitmapInfo.biClrImportant = 0;
 }
 
 App::~App()

@@ -1,0 +1,34 @@
+﻿生成启动时间为 2015/6/25 17:36:59。
+     1>项目“D:\KoneyRenderer\KoneyRenderer\KoneyRenderer.vcxproj”在节点 2 上(Build 个目标)。
+     1>ClCompile:
+         C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\CL.exe /c /Zi /nologo /W3 /WX- /O2 /Oi /Oy- /GL /D WIN32 /D NDEBUG /D _CONSOLE /D _LIB /D _UNICODE /D UNICODE /Gm- /EHsc /MD /GS /Gy /fp:precise /Zc:wchar_t /Zc:forScope /Fo"Release\\" /Fd"Release\vc120.pdb" /Gd /TP /analyze- /errorReport:prompt Renderer.cpp
+         Renderer.cpp
+     1>Renderer.cpp(211): warning C4244: “=”: 从“float”转换到“unsigned char”，可能丢失数据
+     1>Renderer.cpp(212): warning C4244: “=”: 从“float”转换到“unsigned char”，可能丢失数据
+     1>Renderer.cpp(213): warning C4244: “=”: 从“float”转换到“unsigned char”，可能丢失数据
+     1>Renderer.cpp(215): warning C4244: “参数”: 从“float”转换到“unsigned short”，可能丢失数据
+     1>Renderer.cpp(227): warning C4244: “=”: 从“float”转换到“unsigned char”，可能丢失数据
+     1>Renderer.cpp(228): warning C4244: “=”: 从“float”转换到“unsigned char”，可能丢失数据
+     1>Renderer.cpp(229): warning C4244: “=”: 从“float”转换到“unsigned char”，可能丢失数据
+     1>Renderer.cpp(231): warning C4244: “参数”: 从“float”转换到“unsigned short”，可能丢失数据
+     1>Renderer.cpp(245): warning C4244: “=”: 从“float”转换到“unsigned char”，可能丢失数据
+     1>Renderer.cpp(246): warning C4244: “=”: 从“float”转换到“unsigned char”，可能丢失数据
+     1>Renderer.cpp(247): warning C4244: “=”: 从“float”转换到“unsigned char”，可能丢失数据
+     1>Renderer.cpp(249): warning C4244: “参数”: 从“float”转换到“unsigned short”，可能丢失数据
+     1>Renderer.cpp(262): warning C4244: “=”: 从“float”转换到“unsigned char”，可能丢失数据
+     1>Renderer.cpp(263): warning C4244: “=”: 从“float”转换到“unsigned char”，可能丢失数据
+     1>Renderer.cpp(264): warning C4244: “=”: 从“float”转换到“unsigned char”，可能丢失数据
+     1>Renderer.cpp(266): warning C4244: “参数”: 从“float”转换到“unsigned short”，可能丢失数据
+       Link:
+         C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\link.exe /ERRORREPORT:PROMPT /OUT:"D:\KoneyRenderer\Release\KoneyRenderer.exe" /INCREMENTAL:NO /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"D:\KoneyRenderer\Release\KoneyRenderer.pdb" /SUBSYSTEM:WINDOWS /OPT:REF /OPT:ICF /LTCG /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"D:\KoneyRenderer\Release\KoneyRenderer.lib" /MACHINE:X86 /SAFESEH Release\App.obj
+         Release\Cube.obj
+         Release\Renderer.obj
+         Release\Timer.obj
+         正在生成代码
+         已完成代码的生成
+         KoneyRenderer.vcxproj -> D:\KoneyRenderer\Release\KoneyRenderer.exe
+     1>已完成生成项目“D:\KoneyRenderer\KoneyRenderer\KoneyRenderer.vcxproj”(Build 个目标)的操作。
+
+生成成功。
+
+已用时间 00:00:01.26
