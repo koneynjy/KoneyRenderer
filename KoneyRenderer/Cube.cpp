@@ -84,9 +84,9 @@ void CubeApp::updateScene(float dt)
 
 	// Convert Spherical to Cartesian coordinates: mPhi measured from +y
 	// and mTheta measured counterclockwise from -z.
-	float x = 10.0f*sinf(mPhi)*sinf(mTheta);
-	float z = -10.0f*sinf(mPhi)*cosf(mTheta);
-	float y = 10.0f*cosf(mPhi);
+	float x = 8.0f*sinf(mPhi)*sinf(mTheta);
+	float z = -8.0f*sinf(mPhi)*cosf(mTheta);
+	float y = 8.0f*cosf(mPhi);
 
 	// Build the view matrix.
 	XMVECTOR pos = { x, y, z, 1.0f };

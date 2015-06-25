@@ -21,6 +21,7 @@ inline int min3(float a, float b, float c){
 
 }
 
+
 Renderer::Renderer(){}
 DirectX::XMVECTOR tmpVec;
 
@@ -153,10 +154,11 @@ void ::Renderer::BarycentricRaster(Triangle & triangle){
 	genCoe(tmp, X.z, Y.z, X.x, Y.x, X.y, Y.y, a.y, b.y, c.y);
 	genCoe(tmp, X.x, Y.x, X.y, Y.y, X.z, Y.z, a.z, b.z, c.z);
 	//get bounding box
-	int maxx = (int)(max(max(X.x, X.y), X.z));
-	int maxy = (int)(max(max(Y.x, Y.y), Y.z));
-	int minx = (int)(min(min(X.x, X.y), X.z));
-	int miny = (int)(min(min(Y.x, Y.y), Y.z));
+	int maxx = (int)ceilf(max(max(X.x, X.y), X.z));
+	int maxy = (int)ceilf(max(max(Y.x, Y.y), Y.z));
+	int minx = (int)ceilf(min(min(X.x, X.y), X.z));
+	int miny = (int)ceilf(min(min(Y.x, Y.y), Y.z));
+	int dx = maxx - minx;
 	DirectX::XMVECTOR va = XMLoadFloat3(&a);
 	DirectX::XMVECTOR vb = XMLoadFloat3(&b);
 	DirectX::XMVECTOR zvec = { triangle.vert[0].z, triangle.vert[1].z, triangle.vert[2].z };
@@ -200,72 +202,85 @@ void ::Renderer::BarycentricRaster(Triangle & triangle){
 	uv.r[3] = { { 0, 0, 0, 0 } };
 	Vertex tvert;
 	unsigned char red, green, blue;
-	if (abcybase.x >= 0 && abcybase.x <= 1.0f &&
-		abcybase.y >= 0 && abcybase.y <= 1.0f &&
-		abcybase.z >= 0 && abcybase.z <= 1.0f)
-	{
-		//XMStoreFloat4(&tvert.position, DirectX::XMVector4Transform(XMLoadFloat4(&abcybase), pos));
-		//XMStoreFloat4(&tvert.normal, DirectX::XMVector4Transform(XMLoadFloat4(&abcybase), normal));
-		XMStoreFloat2(&tvert.uv, DirectX::XMVector4Transform(XMLoadFloat4(&abcybase), uv));
-		tvert.z = DirectX::XMVector3Dot(XMLoadFloat4(&abcybase), zvec).m128_f32[0];
-		red =	DirectX::XMVector3Dot(XMLoadFloat4(&abcybase), rvec).m128_f32[0];
-		green =	DirectX::XMVector3Dot(XMLoadFloat4(&abcybase), gvec).m128_f32[0];
-		blue =	DirectX::XMVector3Dot(XMLoadFloat4(&abcybase), bvec).m128_f32[0];
-		tvert.c = red || (green << 8) || (blue << 16);
-		OutputMerge(PixelShader(tvert, minx, miny), tvert.z, minx, miny);
-	}
-	for (int j = minx + 1; j <= maxx; j++){
-		XMStoreFloat4(&abcx, DirectX::XMVectorAdd(XMLoadFloat4(&abcx), va));
-		if (abcx.x >= 0 && abcx.x <= 1.0f &&
-			abcx.y >= 0 && abcx.y <= 1.0f &&
-			abcx.z >= 0 && abcx.z <= 1.0f)
-		{
+	//for (int i = miny; i < maxy; i++){
+	//	for (int j = minx; j < maxx; j++){
+	//		if (abcx.x >= 0 && abcx.x <= 1.0f &&
+	//			abcx.y >= 0 && abcx.y <= 1.0f &&
+	//			abcx.z >= 0 && abcx.z <= 1.0f)
+	//		{
+	//			//XMStoreFloat4(&tvert.position, DirectX::XMVector4Transform(XMLoadFloat4(&abcx), pos));
+	//			//XMStoreFloat4(&tvert.normal, DirectX::XMVector4Transform(XMLoadFloat4(&abcx), normal));				
+	//			XMStoreFloat2(&tvert.uv, DirectX::XMVector4Transform(XMLoadFloat4(&abcx), uv));
+	//			tvert.z = DirectX::XMVector3Dot(XMLoadFloat4(&abcx), zvec).m128_f32[0];
+	//			red = DirectX::XMVector3Dot(XMLoadFloat4(&abcx), rvec).m128_f32[0];
+	//			green = DirectX::XMVector3Dot(XMLoadFloat4(&abcx), gvec).m128_f32[0];
+	//			blue = DirectX::XMVector3Dot(XMLoadFloat4(&abcx), bvec).m128_f32[0];
+	//			tvert.c = red | (green << 8) | (blue << 16);
+	//			OutputMerge(PixelShader(tvert, j, i), tvert.z, j, i);
+	//		}
+	//		XMStoreFloat4(&abcx, DirectX::XMVectorAdd(XMLoadFloat4(&abcx), va));
+	//	}
+	//	XMStoreFloat4(&abcybase, DirectX::XMVectorAdd(XMLoadFloat4(&abcybase), vb));
+	//	abcx = abcybase;
+	//}
+
+	for (int i = miny; i < maxy; i++){
+		int start, end;
+		int mint = 0x7fffffff, maxt = 0,t;
+		if (fabs(abcybase.x) < EPS){
+			mint = 0;
+		}
+		else if ((abcybase.x < -EPS && a.x > EPS) ||
+			(abcybase.x > EPS && a.x < -EPS)){
+			t = ceilf(-abcybase.x / a.x);
+			if (t <= dx) {
+				mint = min(mint, t);
+				maxt = max(maxt, t);
+			}
+		}
+
+		if (fabs(abcybase.y) < EPS){
+			mint = 0;
+		}
+		else if ((abcybase.y < -EPS && a.y > EPS) ||
+			(abcybase.y > EPS && a.y < -EPS)){
+			t = ceilf(-abcybase.y / a.y);
+			if (t <= dx) {
+				mint = min(mint, t);
+				maxt = max(maxt, t);
+			}
+		}
+
+		if (fabs(abcybase.z) < EPS){
+			mint = 0;
+		}
+		else if ((abcybase.z < -EPS && a.z > EPS) ||
+			(abcybase.z > EPS && a.z < -EPS)){
+			t = ceilf(-abcybase.z / a.z);
+			if (t <= dx)  {
+				mint = min(mint, t);
+				maxt = max(maxt, t);
+			}
+		}
+		if (mint == maxt){
+			if (i != miny) maxt++;
+		}
+		start = minx + mint;
+		end = minx + maxt;
+		XMStoreFloat4(&abcx, DirectX::XMVectorAdd(XMLoadFloat4(&abcx), DirectX::XMVectorScale(va,mint)));
+		for (int j = start; j < end; j++){
 			//XMStoreFloat4(&tvert.position, DirectX::XMVector4Transform(XMLoadFloat4(&abcx), pos));
-			//XMStoreFloat4(&tvert.normal, DirectX::XMVector4Transform(XMLoadFloat4(&abcx), normal));
+			//XMStoreFloat4(&tvert.normal, DirectX::XMVector4Transform(XMLoadFloat4(&abcx), normal));				
 			XMStoreFloat2(&tvert.uv, DirectX::XMVector4Transform(XMLoadFloat4(&abcx), uv));
 			tvert.z = DirectX::XMVector3Dot(XMLoadFloat4(&abcx), zvec).m128_f32[0];
 			red = DirectX::XMVector3Dot(XMLoadFloat4(&abcx), rvec).m128_f32[0];
 			green = DirectX::XMVector3Dot(XMLoadFloat4(&abcx), gvec).m128_f32[0];
 			blue = DirectX::XMVector3Dot(XMLoadFloat4(&abcx), bvec).m128_f32[0];
-			tvert.c = red || (green << 8) || (blue << 16);
-			OutputMerge(PixelShader(tvert, minx, miny), tvert.z, j, miny);
-		}
-	}
-	for (int i = miny + 1; i <= maxy; i++){
-		XMStoreFloat4(&abcybase, DirectX::XMVectorAdd(XMLoadFloat4(&abcybase), vb));
-		if (abcybase.x >= 0 && abcybase.x <= 1.0f
-			&& abcybase.y >= 0 && abcybase.y <= 1.0f
-			&& abcybase.z >= 0 && abcybase.z <= 1.0f
-			)
-		{
-			//XMStoreFloat4(&tvert.position, DirectX::XMVector4Transform(XMLoadFloat4(&abcybase), pos));
-			//XMStoreFloat4(&tvert.normal, DirectX::XMVector4Transform(XMLoadFloat4(&abcybase), normal));
-			XMStoreFloat2(&tvert.uv, DirectX::XMVector4Transform(XMLoadFloat4(&abcybase), uv));
-			tvert.z = DirectX::XMVector3Dot(XMLoadFloat4(&abcybase), zvec).m128_f32[0];
-			red = DirectX::XMVector3Dot(XMLoadFloat4(&abcybase), rvec).m128_f32[0];
-			green = DirectX::XMVector3Dot(XMLoadFloat4(&abcybase), gvec).m128_f32[0];
-			blue = DirectX::XMVector3Dot(XMLoadFloat4(&abcybase), bvec).m128_f32[0];
-			tvert.c = red || (green << 8) || (blue << 16);
-			OutputMerge(PixelShader(tvert, minx, miny), tvert.z, minx, i);
-		}
-		abcx = abcybase;
-		for (int j = minx + 1; j <= maxx; j++){
+			tvert.c = red | (green << 8) | (blue << 16);
+			OutputMerge(PixelShader(tvert, j, i), tvert.z, j, i);
 			XMStoreFloat4(&abcx, DirectX::XMVectorAdd(XMLoadFloat4(&abcx), va));
-			if (abcx.x >= 0 && abcx.x <= 1.0f &&
-				abcx.y >= 0 && abcx.y <= 1.0f &&
-				abcx.z >= 0 && abcx.z <= 1.0f)
-			{
-				//XMStoreFloat4(&tvert.position, DirectX::XMVector4Transform(XMLoadFloat4(&abcx), pos));
-				//XMStoreFloat4(&tvert.normal, DirectX::XMVector4Transform(XMLoadFloat4(&abcx), normal));				
-				XMStoreFloat2(&tvert.uv, DirectX::XMVector4Transform(XMLoadFloat4(&abcx), uv));
-				tvert.z = DirectX::XMVector3Dot(XMLoadFloat4(&abcx), zvec).m128_f32[0];
-				red = DirectX::XMVector3Dot(XMLoadFloat4(&abcx), rvec).m128_f32[0];
-				green = DirectX::XMVector3Dot(XMLoadFloat4(&abcx), gvec).m128_f32[0];
-				blue = DirectX::XMVector3Dot(XMLoadFloat4(&abcx), bvec).m128_f32[0];
-				tvert.c = red | (green << 8) | (blue << 16);
-				OutputMerge(PixelShader(tvert, minx, miny), tvert.z, j, i);
-			}
 		}
+		XMStoreFloat4(&abcybase, DirectX::XMVectorAdd(XMLoadFloat4(&abcybase), vb));
 	}
 }
 
