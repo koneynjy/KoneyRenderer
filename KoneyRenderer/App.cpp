@@ -135,6 +135,7 @@ void App::updateScene(float dt)
 		t_base += 1.0f;
 		::SetWindowText(mhMainWnd, mFrameStats.c_str());
 	}
+	
 }
 
 void App::drawScene()
