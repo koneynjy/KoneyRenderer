@@ -9,7 +9,7 @@ public:
 	Renderer();
 	~Renderer();
 	void SetTriangleBuffer(Triangle * triBuffer, int size);
-	void VertexShader(Triangle & triangle);
+	void VertexShader(Vertex & vert);
 	void RasterizeAndOutput(Triangle & triangle);
 	unsigned PixelShader(Vertex vin);
 	void OutputMerge(unsigned c, unsigned short z, int x, int y);

@@ -1,5 +1,6 @@
 #include "Renderer.hpp"
 #include <assert.h>
+using namespace DirectX;
 #define CULL_BACK
 #define SCANLINE
 //#define SCANLINE
@@ -40,32 +41,17 @@ void Renderer::SetTriangleBuffer(Triangle *triBuffer, int size)
 		triangleBuffer[i] = triBuffer[i];
 }
 
-void Renderer::VertexShader(Triangle& triangle){
-	XMStoreFloat4(&triangle.vert[0].positionH, DirectX::XMVector4Transform(XMLoadFloat4(&triangle.vert[0].position), mvp));
-	XMStoreFloat4(&triangle.vert[1].positionH, DirectX::XMVector4Transform(XMLoadFloat4(&triangle.vert[1].position), mvp));
-	XMStoreFloat4(&triangle.vert[2].positionH, DirectX::XMVector4Transform(XMLoadFloat4(&triangle.vert[2].position), mvp));
-	DirectX::XMVECTOR diff0 = DirectX::XMVectorMax(DirectX::XMVector3Dot(XMLoadFloat3(&light), XMLoadFloat4(&triangle.vert[0].normal)), { { 0.0f, 0.0f, 0.0f, 0.0f } });
-	DirectX::XMVECTOR diff1 = DirectX::XMVectorMax(DirectX::XMVector3Dot(XMLoadFloat3(&light), XMLoadFloat4(&triangle.vert[1].normal)), { { 0.0f, 0.0f, 0.0f, 0.0f } });
-	DirectX::XMVECTOR diff2 = DirectX::XMVectorMax(DirectX::XMVector3Dot(XMLoadFloat3(&light), XMLoadFloat4(&triangle.vert[2].normal)), { { 0.0f, 0.0f, 0.0f, 0.0f } });
+void Renderer::VertexShader(Vertex& vert){
+	XMVECTOR pos = XMLoadFloat4(&vert.position);
+	XMVECTOR normal = XMLoadFloat4(&vert.normal);
+	XMStoreFloat4(&vert.positionH, XMVector4Transform(pos, mvp));
 	
-	DirectX::XMVECTOR spec0 = DirectX::XMVectorMax(DirectX::XMVector3Dot(DirectX::XMVectorSubtract(XMLoadFloat3(&eyePos), XMLoadFloat4(&triangle.vert[0].position)), XMLoadFloat4(&triangle.vert[0].normal)), { { 0.0f, 0.0f, 0.0f, 0.0f } });
-	DirectX::XMVECTOR spec1 = DirectX::XMVectorMax(DirectX::XMVector3Dot(DirectX::XMVectorSubtract(XMLoadFloat3(&eyePos), XMLoadFloat4(&triangle.vert[0].position)), XMLoadFloat4(&triangle.vert[1].normal)), { { 0.0f, 0.0f, 0.0f, 0.0f } });
-	DirectX::XMVECTOR spec2 = DirectX::XMVectorMax(DirectX::XMVector3Dot(DirectX::XMVectorSubtract(XMLoadFloat3(&eyePos), XMLoadFloat4(&triangle.vert[0].position)), XMLoadFloat4(&triangle.vert[2].normal)), { { 0.0f, 0.0f, 0.0f, 0.0f } });
-	diff0 = DirectX::XMVectorMultiply(diff0, XMLoadFloat3(&lightColor));
-	diff1 = DirectX::XMVectorMultiply(diff1, XMLoadFloat3(&lightColor));
-	diff2 = DirectX::XMVectorMultiply(diff2, XMLoadFloat3(&lightColor));
-
-	spec0 = DirectX::XMVectorMultiply(DirectX::XMVectorPow(spec0, XMLoadFloat3(&n)), XMLoadFloat3(&spec));
-	spec1 = DirectX::XMVectorMultiply(DirectX::XMVectorPow(spec1, XMLoadFloat3(&n)), XMLoadFloat3(&spec));
-	spec2 = DirectX::XMVectorMultiply(DirectX::XMVectorPow(spec2, XMLoadFloat3(&n)), XMLoadFloat3(&spec));
-
-	spec0 = DirectX::XMVectorAdd(XMLoadFloat4(&triangle.vert[0].color), spec0);
-	spec0 = DirectX::XMVectorAdd(XMLoadFloat4(&triangle.vert[1].color), spec1);
-	spec0 = DirectX::XMVectorAdd(XMLoadFloat4(&triangle.vert[2].color), spec2);
-
-	XMStoreFloat4(&triangle.vert[0].pcolor, DirectX::XMVectorSaturate(DirectX::XMVectorMultiplyAdd(diff0, spec0, XMLoadFloat3(&aColor))));
-	XMStoreFloat4(&triangle.vert[1].pcolor, DirectX::XMVectorSaturate(DirectX::XMVectorMultiplyAdd(diff1, spec1, XMLoadFloat3(&aColor))));
-	XMStoreFloat4(&triangle.vert[2].pcolor, DirectX::XMVectorSaturate(DirectX::XMVectorMultiplyAdd(diff2, spec2, XMLoadFloat3(&aColor))));
+	XMVECTOR diffuse = XMVectorMax(XMVector3Dot(XMLoadFloat3(&light), normal), { { 0.0f, 0.0f, 0.0f, 0.0f } });
+	XMVECTOR specular = XMVectorMax(XMVector3Dot(XMVectorSubtract(XMLoadFloat3(&eyePos), pos), normal), { { 0.0f, 0.0f, 0.0f, 0.0f } });
+	diffuse = XMVectorMultiply(diffuse, XMLoadFloat3(&lightColor));
+	specular = XMVectorMultiply(XMVectorPow(specular, XMLoadFloat3(&n)), XMLoadFloat3(&spec));
+	specular = XMVectorAdd(XMLoadFloat4(&vert.color), specular);
+	XMStoreFloat4(&vert.pcolor, XMVectorSaturate(XMVectorMultiplyAdd(diffuse, specular, XMLoadFloat3(&aColor))));
 }
 
 unsigned Renderer::PixelShader(Vertex vin){
@@ -91,7 +77,9 @@ void Renderer::Render(){
 	memset(zbuffer, 0xff, sizeof(short) * fbWidth * fbHeight);
 	memset(fbdata, 0, sizeof(int) * fbWidth * fbHeight);
 	for (int i = 0; i < bSize; i++){
-		VertexShader(triangleBuffer[i]);
+		VertexShader(triangleBuffer[i].vert[0]);
+		VertexShader(triangleBuffer[i].vert[1]);
+		VertexShader(triangleBuffer[i].vert[2]);
 		RasterizeAndOutput(triangleBuffer[i]);
 	}
 	count = count * count;
@@ -101,44 +89,42 @@ void Renderer::RasterizeAndOutput(Triangle & triangle){
 	int width = fbWidth - 1, height = fbHeight - 1;
 	float wScale = width * 0.5f, hScale = height * 0.5f;
 	//do divide
-	DirectX::XMFLOAT4 p0 = triangle.vert[0].positionH;
-	DirectX::XMFLOAT4 p1 = triangle.vert[1].positionH;
-	DirectX::XMFLOAT4 p2 = triangle.vert[2].positionH;
-	DirectX::XMFLOAT3 zz = { 1.0f / p0.w, 1.0f / p1.w, 1.0f / p2.w };
-	XMStoreFloat4(&p0, DirectX::XMVectorScale(XMLoadFloat4(&p0), zz.x));
-	XMStoreFloat4(&p1, DirectX::XMVectorScale(XMLoadFloat4(&p1), zz.y));
-	XMStoreFloat4(&p2, DirectX::XMVectorScale(XMLoadFloat4(&p2), zz.z));
+	XMFLOAT4 p0 = triangle.vert[0].positionH;
+	XMFLOAT4 p1 = triangle.vert[1].positionH;
+	XMFLOAT4 p2 = triangle.vert[2].positionH;
+	XMFLOAT3 zz = { 1.0f / p0.w, 1.0f / p1.w, 1.0f / p2.w };
+	XMStoreFloat4(&p0, XMVectorScale(XMLoadFloat4(&p0), zz.x));
+	XMStoreFloat4(&p1, XMVectorScale(XMLoadFloat4(&p1), zz.y));
+	XMStoreFloat4(&p2, XMVectorScale(XMLoadFloat4(&p2), zz.z));
 	triangle.vert[0].z = p0.z * 65535;
 	triangle.vert[1].z = p1.z * 65535;
 	triangle.vert[2].z = p2.z * 65535;
 #ifdef CULL_BACK
-	DirectX::XMVECTOR v0 = DirectX::XMVectorSubtract(XMLoadFloat4(&p1), XMLoadFloat4(&p0));
-	DirectX::XMVECTOR v1 = DirectX::XMVectorSubtract(XMLoadFloat4(&p2), XMLoadFloat4(&p1));
-	DirectX::XMFLOAT3 cross;
-	XMStoreFloat3(&cross, DirectX::XMVector3Cross(v0, v1));
-	if (cross.z >= 0) return;
+	XMVECTOR v0 = XMVectorSubtract(XMLoadFloat4(&p1), XMLoadFloat4(&p0));
+	XMVECTOR v1 = XMVectorSubtract(XMLoadFloat4(&p2), XMLoadFloat4(&p1));
+	XMVECTOR cross = XMVector3Cross(v0, v1);
+	if (cross.m128_f32[2] >= 0) return;
 #endif // CULL_BACK
 
 #ifdef CULL_FRONT
-	DirectX::XMVECTOR v0 = DirectX::XMVectorSubtract(XMLoadFloat4(&p1), XMLoadFloat4(&p0));
-	DirectX::XMVECTOR v1 = DirectX::XMVectorSubtract(XMLoadFloat4(&p2), XMLoadFloat4(&p1));
-	DirectX::XMFLOAT3 cross;
-	XMStoreFloat3(&cross, DirectX::XMVector3Cross(v0, v1));
-	if (cross.z <= 0) return;
+	XMVECTOR v0 =XMVectorSubtract(XMLoadFloat4(&p1), XMLoadFloat4(&p0));
+	XMVECTOR v1 =XMVectorSubtract(XMLoadFloat4(&p2), XMLoadFloat4(&p1));
+	XMVECTOR cross = XMVector3Cross(v0, v1);
+	if (cross.m128_f32[2] <= 0) return;
 #endif // CULL_BACK
 
-	DirectX::XMFLOAT3 X = { p0.x, p1.x, p2.x };
-	DirectX::XMFLOAT3 Y = { p0.y, p1.y, p2.y };
-	DirectX::XMVECTOR vX = XMLoadFloat3(&X);
-	DirectX::XMVECTOR vY = XMLoadFloat3(&Y);
-	DirectX::XMVECTOR wsVec = { wScale, wScale, wScale };
-	DirectX::XMVECTOR hsVec = { hScale, hScale, hScale };
+	XMFLOAT3 X = { p0.x, p1.x, p2.x };
+	XMFLOAT3 Y = { p0.y, p1.y, p2.y };
+	XMVECTOR vX = XMLoadFloat3(&X);
+	XMVECTOR vY = XMLoadFloat3(&Y);
+	XMVECTOR wsVec = { wScale, wScale, wScale };
+	XMVECTOR hsVec = { hScale, hScale, hScale };
 	//to image coord
-	vX = DirectX::XMVectorMultiplyAdd(vX, wsVec, wsVec);
-	vY = DirectX::XMVectorMultiplyAdd(vY, hsVec, hsVec);
+	vX = XMVectorMultiplyAdd(vX, wsVec, wsVec);
+	vY = XMVectorMultiplyAdd(vY, hsVec, hsVec);
 	XMStoreFloat3(&X, vX);
 	XMStoreFloat3(&Y, vY);
-	DirectX::XMFLOAT3 a, b, c;
+	XMFLOAT3 a, b, c;
 	//coeff
 	//float a0, a1, a2, b0, b1, b2, c0, c1, c2;
 	float tmp = f12(X.y, Y.y, X.z, Y.z, X.x, Y.x);
@@ -153,33 +139,18 @@ void Renderer::RasterizeAndOutput(Triangle & triangle){
 	int minx = (int)ceilf(min(min(X.x, X.y), X.z));
 	int miny = (int)floorf(min(min(Y.x, Y.y), Y.z));
 	int dx = maxx - minx, starty = miny + 1;
-	DirectX::XMVECTOR va = XMLoadFloat3(&a);
-	DirectX::XMVECTOR vb = XMLoadFloat3(&b);
-	DirectX::XMVECTOR zvec = { triangle.vert[0].z, triangle.vert[1].z, triangle.vert[2].z };
-	DirectX::XMVECTOR rvec = {
-		(unsigned char)triangle.vert[0].c,
-		(unsigned char)triangle.vert[1].c,
-		(unsigned char)triangle.vert[2].c
-	};
-	DirectX::XMVECTOR gvec = {
-		(unsigned char)(triangle.vert[0].c >> 8),
-		(unsigned char)(triangle.vert[1].c >> 8),
-		(unsigned char)(triangle.vert[2].c >> 8),
-	};
-	DirectX::XMVECTOR bvec = {
-		(unsigned char)(triangle.vert[0].c >> 16),
-		(unsigned char)(triangle.vert[1].c >> 16),
-		(unsigned char)(triangle.vert[2].c >> 16),
-	};
-	DirectX::XMFLOAT4 abcybase = {
+	XMVECTOR va = XMLoadFloat3(&a);
+	XMVECTOR vb = XMLoadFloat3(&b);
+	XMVECTOR zvec = { triangle.vert[0].z, triangle.vert[1].z, triangle.vert[2].z };
+	XMFLOAT4 abcybase = {
 		f(a.x, b.x, c.x, minx, maxy),
 		f(a.y, b.y, c.y, minx, maxy),
 		f(a.z, b.z, c.z, minx, maxy),
 		0
 	};
 
-	DirectX::XMFLOAT4 abcx = abcybase;
-	DirectX::XMMATRIX pos, normal, uv, rgb;
+	XMFLOAT4 abcx = abcybase;
+	XMMATRIX pos, normal, uv, rgb;
 	pos.r[0] = XMLoadFloat4(&triangle.vert[0].position);
 	pos.r[1] = XMLoadFloat4(&triangle.vert[1].position);
 	pos.r[2] = XMLoadFloat4(&triangle.vert[2].position);
@@ -199,8 +170,8 @@ void Renderer::RasterizeAndOutput(Triangle & triangle){
 	rgb.r[1] = XMLoadFloat4(&triangle.vert[1].pcolor);
 	rgb.r[2] = XMLoadFloat4(&triangle.vert[2].pcolor);
 	rgb.r[3] = { { 0, 0, 0, 0 } };
-	DirectX::XMFLOAT4 tabcfloor, tabcCeil;
-	DirectX::XMVECTOR abcz, abcdot, abcvec, abcyvec;
+	XMFLOAT4 tabcfloor, tabcCeil;
+	XMVECTOR abcz, abcdot, abcvec, abcyvec;
 	Vertex tvert;
 	abcyvec = XMLoadFloat4(&abcybase);
 #ifdef SCANLINE
@@ -233,8 +204,8 @@ void Renderer::RasterizeAndOutput(Triangle & triangle){
 			if (rec[0] > rec[1]) std::swap(rec[0], rec[1]);
 			int k = -1;
 			for (k = 0; k < 3; k++){
-				XMStoreFloat4(&tabcCeil, DirectX::XMVectorAdd(abcyvec, DirectX::XMVectorScale(va, rec[k])));
-				XMStoreFloat4(&tabcfloor, DirectX::XMVectorSubtract(XMLoadFloat4(&tabcCeil), va));
+				XMStoreFloat4(&tabcCeil, XMVectorAdd(abcyvec, XMVectorScale(va, rec[k])));
+				XMStoreFloat4(&tabcfloor, XMVectorSubtract(XMLoadFloat4(&tabcCeil), va));
 				if (tabcCeil.x >= 0 && tabcCeil.x <= 1.0f &&
 					tabcCeil.y >= 0 && tabcCeil.y <= 1.0f &&
 					tabcCeil.z >= 0 && tabcCeil.z <= 1.0f){
@@ -258,7 +229,7 @@ void Renderer::RasterizeAndOutput(Triangle & triangle){
 			mint = rec[0];
 			start = minx + rec[0];
 			end = minx + rec[1];
-			abcvec = DirectX::XMVectorAdd(abcyvec, DirectX::XMVectorScale(va, mint));
+			abcvec = XMVectorAdd(abcyvec, XMVectorScale(va, mint));
 		}
 		
 		for (int j = start; j < end; j++){
@@ -268,16 +239,16 @@ void Renderer::RasterizeAndOutput(Triangle & triangle){
 			XMStoreFloat2(&tvert.uv, DirectX::XMVector4Transform(abcz, uv));
 			XMStoreFloat4(&tvert.color, DirectX::XMVector4Transform(abcz, rgb));
 #else
-			XMStoreFloat2(&tvert.uv, DirectX::XMVector4Transform(abcvec, uv));
-			XMStoreFloat4(&tvert.color, DirectX::XMVector4Transform(abcvec, rgb));
+			XMStoreFloat2(&tvert.uv, XMVector4Transform(abcvec, uv));
+			XMStoreFloat4(&tvert.color, XMVector4Transform(abcvec, rgb));
 #endif
 			//XMStoreFloat4(&tvert.position, DirectX::XMVector4Transform(XMLoadFloat4(&abcx), pos));
 			//XMStoreFloat4(&tvert.normal, DirectX::XMVector4Transform(XMLoadFloat4(&abcx), normal));
-			tvert.z = DirectX::XMVector3Dot(abcvec, zvec).m128_f32[0];
+			tvert.z = XMVector3Dot(abcvec, zvec).m128_f32[0];
 			OutputMerge(PixelShader(tvert), tvert.z, j, i);
-			abcvec = DirectX::XMVectorAdd(abcvec, va);
+			abcvec = XMVectorAdd(abcvec, va);
 		}
-		abcyvec = DirectX::XMVectorSubtract(abcyvec, vb);
+		abcyvec = XMVectorSubtract(abcyvec, vb);
 	}
 #else
 	//brute force
@@ -289,14 +260,14 @@ void Renderer::RasterizeAndOutput(Triangle & triangle){
 			{
 				//XMStoreFloat4(&tvert.position, DirectX::XMVector4Transform(XMLoadFloat4(&abcx), pos));
 				//XMStoreFloat4(&tvert.normal, DirectX::XMVector4Transform(XMLoadFloat4(&abcx), normal));				
-				XMStoreFloat2(&tvert.uv, DirectX::XMVector4Transform(XMLoadFloat4(&abcx), uv));
-				tvert.z = DirectX::XMVector3Dot(XMLoadFloat4(&abcx), zvec).m128_f32[0];
-				XMStoreFloat4(&tvert.color, DirectX::XMVector4Transform(XMLoadFloat4(&abcx), rgb));
+				XMStoreFloat2(&tvert.uv, XMVector4Transform(XMLoadFloat4(&abcx), uv));
+				tvert.z = XMVector3Dot(XMLoadFloat4(&abcx), zvec).m128_f32[0];
+				XMStoreFloat4(&tvert.color, XMVector4Transform(XMLoadFloat4(&abcx), rgb));
 				OutputMerge(PixelShader(tvert), tvert.z, j, i);
 			}
-			XMStoreFloat4(&abcx, DirectX::XMVectorAdd(XMLoadFloat4(&abcx), va));
+			XMStoreFloat4(&abcx, XMVectorAdd(XMLoadFloat4(&abcx), va));
 		}
-		XMStoreFloat4(&abcybase, DirectX::XMVectorSubtract(XMLoadFloat4(&abcybase), vb));
+		XMStoreFloat4(&abcybase, XMVectorSubtract(XMLoadFloat4(&abcybase), vb));
 		abcx = abcybase;
 	}
 #endif
