@@ -1,9 +1,12 @@
 #include "Renderer.hpp"
+#include "Config.hpp"
 #include <assert.h>
 using namespace DirectX;
-#define CULL_BACK
-#define SCANLINE
-//#define SCANLINE
+#define INTRIANGLE(x)											\
+	x.m128_f32[0] > -EPS && x.m128_f32[0] < 1.0f + EPS &&		\
+	x.m128_f32[1] > -EPS && x.m128_f32[1] < 1.0f + EPS &&		\
+	x.m128_f32[2] > -EPS && x.m128_f32[2] < 1.0f + EPS			
+
 inline float f12(float x1, float y1,float x2, float y2,  float x, float y){
 	return (y1 - y2) * x + (x2 - x1) * y + x1 * y2 - x2 * y1;
 }
@@ -18,20 +21,18 @@ inline float f(float a, float b, float c, int x, int y){
 	return a * x + b * y + c;
 }
 
-
-Renderer::Renderer(){}
-DirectX::XMVECTOR tmpVec;
-
+Renderer::Renderer():fbdata(NULL),zbuffer(NULL){}
 void Renderer::setSize(int width, int height){
 	fbWidth = width, fbHeight = height;
 	fbdata = new unsigned[width * height];
 	zbuffer = new unsigned short[width * height];
+	texture.Load("Texture\\wood.bmp");
 }
 
 Renderer::~Renderer()
 {
-	delete[] fbdata;
-	delete[] zbuffer;
+	if(fbdata) delete[] fbdata;
+	if(zbuffer) delete[] zbuffer;
 }
 
 void Renderer::SetTriangleBuffer(Triangle *triBuffer, int size)
@@ -41,41 +42,100 @@ void Renderer::SetTriangleBuffer(Triangle *triBuffer, int size)
 		triangleBuffer[i] = triBuffer[i];
 }
 
-void Renderer::VertexShader(Vertex& vert){
+__forceinline XMFLOAT4 Renderer::lightShader(Vertex& vert){
+	XMFLOAT4 res;
 	XMVECTOR pos = XMLoadFloat4(&vert.position);
 	XMVECTOR normal = XMLoadFloat4(&vert.normal);
-	XMStoreFloat4(&vert.positionH, XMVector4Transform(pos, mvp));
-	
-	XMVECTOR diffuse = XMVectorMax(XMVector3Dot(XMLoadFloat3(&light), normal), { { 0.0f, 0.0f, 0.0f, 0.0f } });
-	XMVECTOR specular = XMVectorMax(XMVector3Dot(XMVectorSubtract(XMLoadFloat3(&eyePos), pos), normal), { { 0.0f, 0.0f, 0.0f, 0.0f } });
-	diffuse = XMVectorMultiply(diffuse, XMLoadFloat3(&lightColor));
-	specular = XMVectorMultiply(XMVectorPow(specular, XMLoadFloat3(&n)), XMLoadFloat3(&spec));
-	specular = XMVectorAdd(XMLoadFloat4(&vert.color), specular);
-	XMStoreFloat4(&vert.pcolor, XMVectorSaturate(XMVectorMultiplyAdd(diffuse, specular, XMLoadFloat3(&aColor))));
-}
-
-unsigned Renderer::PixelShader(Vertex vin){
-	unsigned ret;
-	unsigned char red, green, blue;
-	red = vin.color.x * 255;
-	green = vin.color.y * 255;
-	blue = vin.color.z * 255;
-	ret = blue | (green << 8) | (red << 16);
-	return ret;
-}
-
-void Renderer::OutputMerge(unsigned c, unsigned short z, int x, int y){
-	int idx = y * fbWidth + x;
-	if (zbuffer[idx] > z){//ztest
-		fbdata[idx] = c;
-		zbuffer[idx] = z;
+	XMVECTOR color = XMLoadFloat4(&vert.color);
+	XMVECTOR lightc = XMLoadFloat3(&lightColor);
+#ifdef POINTLIGHT
+	XMVECTOR l = XMVector3Normalize(XMVectorSubtract(XMLoadFloat3(&lightPoint), pos));
+#else
+	XMVECTOR l = XMLoadFloat3(&light);
+#endif
+	float diff = max(XMVector3Dot(l, normal).m128_f32[0],0.0f);
+	XMVECTOR diffuse = XMVectorAdd(XMVectorScale(lightc, diff), XMLoadFloat3(&aColor));
+#ifdef SPECULAR
+	XMVECTOR r = XMVector3Reflect(XMVector3Normalize(XMVectorSubtract(pos, XMLoadFloat3(&eyePos))), normal);
+	float sp = XMVector3Dot(l, r).m128_f32[0];
+	if (sp > EPS){
+		XMVECTOR specular = XMVectorScale(XMLoadFloat3(&spec), powf(sp, n));
+		specular = XMVectorMultiply(lightc, specular);
+		XMStoreFloat4(&res, XMVectorSaturate(XMVectorAdd(specular, XMVectorMultiply(diffuse, color))));
 	}
+	else{
+		XMStoreFloat4(&res, XMVectorSaturate(XMVectorMultiply(diffuse, color)));
+	}
+	
+#else
+	XMStoreFloat4(&res, XMVectorSaturate(XMVectorAdd(XMVectorMultiply(diffuse, color), XMVectorMultiply(XMLoadFloat3(&aColor), color))));
+#endif
+	return res;
+}
+
+void Renderer::VertexShader(Vertex& vert){
+	XMVECTOR pos = XMLoadFloat4(&vert.position);
+#ifdef ROTATE
+	XMStoreFloat4(&vert.position, XMVector4Transform(pos, mw));
+	XMStoreFloat4(&vert.normal, XMVector3Transform(XMLoadFloat4(&vert.normal), mw));
+#endif
+	XMStoreFloat4(&vert.positionH, XMVector4Transform(pos, mvp));
+#ifdef VERTEXLIGHT
+	vert.pcolor = lightShader(vert);
+#else
+	vert.pcolor = vert.color;
+#endif
+	
+	
+}
+
+__forceinline XMFLOAT4 Renderer::PixelShader(Vertex vin, float z){
+#ifdef TEXTURE
+#ifdef TRILINEAR
+	//vin.color = texture.MipMapNearestSampler(vin.uv, z);
+	vin.color = texture.TrilinearSampler(vin.uv, z);
+#else
+#ifdef BILINEAR
+#ifdef MIPMAP
+	vin.color = texture.MipMapBilinearSampler(vin.uv, z);
+#else
+	vin.color = texture.BilinearSampler(vin.uv);
+#endif // MIPMAP
+#else
+#ifdef MIPMAP
+	vin.color = texture.MipMapNearestSampler(vin.uv, z);
+#else
+	vin.color = texture.NearestSampler(vin.uv);
+#endif // MIPMAP
+#endif	
+#endif
+#endif
+#ifdef PIXELLIGHT
+	return lightShader(vin);
+#else
+	return vin.color;
+#endif	
+}
+
+__forceinline void Renderer::OutputMerge(XMFLOAT4 c, unsigned short z, int x, int y){
+	int idx = y * fbWidth + x;
+#ifdef ZTEST
+	if (zbuffer[idx] <= z) return;
+#endif
+#ifdef ZWRITE
+	zbuffer[idx] = z;
+#endif
+	unsigned char red, green, blue, alpha;
+	red = c.x * 255;
+	green = c.y * 255;
+	blue = c.z * 255;
+	fbdata[idx] = blue | (green << 8) | (red << 16);
 }
 
 void Renderer::Render(){
 	count = 0;
 	memset(zbuffer, 0xff, sizeof(short) * fbWidth * fbHeight);
-	memset(fbdata, 0, sizeof(int) * fbWidth * fbHeight);
+	memset(fbdata, 0x88, sizeof(int) * fbWidth * fbHeight);
 	for (int i = 0; i < bSize; i++){
 		VertexShader(triangleBuffer[i].vert[0]);
 		VertexShader(triangleBuffer[i].vert[1]);
@@ -89,67 +149,60 @@ void Renderer::RasterizeAndOutput(Triangle & triangle){
 	int width = fbWidth - 1, height = fbHeight - 1;
 	float wScale = width * 0.5f, hScale = height * 0.5f;
 	//do divide
-	XMFLOAT4 p0 = triangle.vert[0].positionH;
-	XMFLOAT4 p1 = triangle.vert[1].positionH;
-	XMFLOAT4 p2 = triangle.vert[2].positionH;
-	XMFLOAT3 zz = { 1.0f / p0.w, 1.0f / p1.w, 1.0f / p2.w };
-	XMStoreFloat4(&p0, XMVectorScale(XMLoadFloat4(&p0), zz.x));
-	XMStoreFloat4(&p1, XMVectorScale(XMLoadFloat4(&p1), zz.y));
-	XMStoreFloat4(&p2, XMVectorScale(XMLoadFloat4(&p2), zz.z));
-	triangle.vert[0].z = p0.z * 65535;
-	triangle.vert[1].z = p1.z * 65535;
-	triangle.vert[2].z = p2.z * 65535;
+	XMVECTOR p0 = XMLoadFloat4(&triangle.vert[0].positionH);
+	XMVECTOR p1 = XMLoadFloat4(&triangle.vert[1].positionH);
+	XMVECTOR p2 = XMLoadFloat4(&triangle.vert[2].positionH);
+	XMVECTOR zz = { 1.0f / p0.m128_f32[3], 1.0f / p1.m128_f32[3], 1.0f / p2.m128_f32[3] };
+	p0 = XMVectorScale(p0, zz.m128_f32[0]);
+	p1 = XMVectorScale(p1, zz.m128_f32[1]);
+	p2 = XMVectorScale(p2, zz.m128_f32[2]);
+	XMVECTOR zvec = { p0.m128_f32[2] * 65535, p0.m128_f32[2] * 65535, p2.m128_f32[2] * 65535 };
 #ifdef CULL_BACK
-	XMVECTOR v0 = XMVectorSubtract(XMLoadFloat4(&p1), XMLoadFloat4(&p0));
-	XMVECTOR v1 = XMVectorSubtract(XMLoadFloat4(&p2), XMLoadFloat4(&p1));
+	XMVECTOR v0 = XMVectorSubtract(p1, p0);
+	XMVECTOR v1 = XMVectorSubtract(p2, p1);
 	XMVECTOR cross = XMVector3Cross(v0, v1);
 	if (cross.m128_f32[2] >= 0) return;
 #endif // CULL_BACK
 
 #ifdef CULL_FRONT
-	XMVECTOR v0 =XMVectorSubtract(XMLoadFloat4(&p1), XMLoadFloat4(&p0));
-	XMVECTOR v1 =XMVectorSubtract(XMLoadFloat4(&p2), XMLoadFloat4(&p1));
+	XMVECTOR v0 = XMVectorSubtract(p1, p0);
+	XMVECTOR v1 = XMVectorSubtract(p2, p1);
 	XMVECTOR cross = XMVector3Cross(v0, v1);
 	if (cross.m128_f32[2] <= 0) return;
 #endif // CULL_BACK
 
-	XMFLOAT3 X = { p0.x, p1.x, p2.x };
-	XMFLOAT3 Y = { p0.y, p1.y, p2.y };
-	XMVECTOR vX = XMLoadFloat3(&X);
-	XMVECTOR vY = XMLoadFloat3(&Y);
+	XMVECTOR X = { p0.m128_f32[0], p1.m128_f32[0], p2.m128_f32[0] };
+	XMVECTOR Y = { p0.m128_f32[1], p1.m128_f32[1], p2.m128_f32[1] };
 	XMVECTOR wsVec = { wScale, wScale, wScale };
 	XMVECTOR hsVec = { hScale, hScale, hScale };
 	//to image coord
-	vX = XMVectorMultiplyAdd(vX, wsVec, wsVec);
-	vY = XMVectorMultiplyAdd(vY, hsVec, hsVec);
-	XMStoreFloat3(&X, vX);
-	XMStoreFloat3(&Y, vY);
-	XMFLOAT3 a, b, c;
+	X = XMVectorMultiplyAdd(X, wsVec, wsVec);
+	Y = XMVectorMultiplyAdd(Y, hsVec, hsVec);
+	XMVECTOR a, b, c;
 	//coeff
 	//float a0, a1, a2, b0, b1, b2, c0, c1, c2;
-	float tmp = f12(X.y, Y.y, X.z, Y.z, X.x, Y.x);
-	if (fabs(tmp) < EPS) return;
-	genCoe(tmp, X.y, Y.y, X.z, Y.z, X.x, Y.x, a.x, b.x, c.x);
-	genCoe(tmp, X.z, Y.z, X.x, Y.x, X.y, Y.y, a.y, b.y, c.y);
-	genCoe(tmp, X.x, Y.x, X.y, Y.y, X.z, Y.z, a.z, b.z, c.z);
+	float area = f12(X.m128_f32[0], Y.m128_f32[0], X.m128_f32[1], Y.m128_f32[1], X.m128_f32[2], Y.m128_f32[2]);
+	if (fabs(area) < EPS) return;
+	genCoe(area, X.m128_f32[1], Y.m128_f32[1], X.m128_f32[2], Y.m128_f32[2], X.m128_f32[0], Y.m128_f32[0], a.m128_f32[0], b.m128_f32[0], c.m128_f32[0]);
+	genCoe(area, X.m128_f32[2], Y.m128_f32[2], X.m128_f32[0], Y.m128_f32[0], X.m128_f32[1], Y.m128_f32[1], a.m128_f32[1], b.m128_f32[1], c.m128_f32[1]);
+	genCoe(area, X.m128_f32[0], Y.m128_f32[0], X.m128_f32[1], Y.m128_f32[1], X.m128_f32[2], Y.m128_f32[2], a.m128_f32[2], b.m128_f32[2], c.m128_f32[2]);
 	//get bounding box
-	int maxx = (int)ceilf(max(max(X.x, X.y), X.z));
-	int maxy = (int)floorf(max(max(Y.x, Y.y), Y.z));
+	int maxx = (int)ceilf(max(max(X.m128_f32[0], X.m128_f32[1]), X.m128_f32[2]));
+	int maxy = (int)floorf(max(max(Y.m128_f32[0], Y.m128_f32[1]), Y.m128_f32[2]));
 	//int minx = (int)floorf(min(min(X.x, X.y), X.z));
-	int minx = (int)ceilf(min(min(X.x, X.y), X.z));
-	int miny = (int)floorf(min(min(Y.x, Y.y), Y.z));
-	int dx = maxx - minx, starty = miny + 1;
-	XMVECTOR va = XMLoadFloat3(&a);
-	XMVECTOR vb = XMLoadFloat3(&b);
-	XMVECTOR zvec = { triangle.vert[0].z, triangle.vert[1].z, triangle.vert[2].z };
-	XMFLOAT4 abcybase = {
-		f(a.x, b.x, c.x, minx, maxy),
-		f(a.y, b.y, c.y, minx, maxy),
-		f(a.z, b.z, c.z, minx, maxy),
+	int minx = (int)ceilf(min(min(X.m128_f32[0], X.m128_f32[1]), X.m128_f32[2]));
+	int miny = (int)floorf(min(min(Y.m128_f32[0], Y.m128_f32[1]), Y.m128_f32[2]));
+	int dx = maxx - minx,padding[2];
+	if (maxy == miny || minx == maxx) return;
+	XMVECTOR abcybase = {
+		f(a.m128_f32[0], b.m128_f32[0], c.m128_f32[0], minx, maxy),
+		f(a.m128_f32[1], b.m128_f32[1], c.m128_f32[1], minx, maxy),
+		f(a.m128_f32[2], b.m128_f32[2], c.m128_f32[2], minx, maxy),
 		0
 	};
-
-	XMFLOAT4 abcx = abcybase;
+	XMVECTOR abcx = abcybase;
+	float zybase = XMVector3Dot(abcybase, zvec).m128_f32[0], zx;
+	float zdx = XMVector3Dot(abcybase, a).m128_f32[0], zdy = XMVector3Dot(abcybase, b).m128_f32[0];
 	XMMATRIX pos, normal, uv, rgb;
 	pos.r[0] = XMLoadFloat4(&triangle.vert[0].position);
 	pos.r[1] = XMLoadFloat4(&triangle.vert[1].position);
@@ -170,104 +223,143 @@ void Renderer::RasterizeAndOutput(Triangle & triangle){
 	rgb.r[1] = XMLoadFloat4(&triangle.vert[1].pcolor);
 	rgb.r[2] = XMLoadFloat4(&triangle.vert[2].pcolor);
 	rgb.r[3] = { { 0, 0, 0, 0 } };
-	XMFLOAT4 tabcfloor, tabcCeil;
-	XMVECTOR abcz, abcdot, abcvec, abcyvec;
+	XMVECTOR abczBasey = XMVectorMultiply(abcybase, zz);
+	XMVECTOR za = XMVectorMultiply(a, zz),zb = XMVectorMultiply(b, zz);
+	XMVECTOR colorBasey = XMVector4Transform(abczBasey, rgb), colorX = colorBasey;
+	XMVECTOR uvBasey = XMVector4Transform(abczBasey, uv), uvX = uvBasey;
+	XMVECTOR colorZa = XMVector4Transform(za, rgb), colorZb = XMVector4Transform(zb, rgb);
+	XMVECTOR uvZa = XMVector4Transform(za, uv), uvZb = XMVector4Transform(zb, uv);
+#ifdef PIXELLIGHT
+	XMVECTOR posBasey = XMVector4Transform(abczBasey, pos), posX = posBasey;
+	XMVECTOR normalBasey = XMVector4Transform(abczBasey, normal), normalX = normalBasey;
+	XMVECTOR posZa = XMVector4Transform(za, pos), posZb = XMVector4Transform(zb, pos);
+	XMVECTOR normalZa = XMVector4Transform(za, normal), normalZb = XMVector4Transform(zb, normal);
+#endif
+
+	float zabcBaseY = XMVector3Dot(zz, abcybase).m128_f32[0], zabcX = zabcBaseY;
+	float zaScale = XMVector3Dot(zz, a).m128_f32[0], zbScale = XMVector3Dot(zz, b).m128_f32[0];
+	XMVECTOR tabcfloor, tabcCeil;
+	XMVECTOR abcz;
 	Vertex tvert;
-	abcyvec = XMLoadFloat4(&abcybase);
 #ifdef SCANLINE
 	for (int i = maxy; i > miny; i--){
-		XMStoreFloat4(&abcx ,abcyvec);
-		int start = -1, end = -1, cnt = 0;
-		int rec[3] = { 0, 0, 0 };
-		int mint, t;
-		if (fabs(a.x) > EPS){
-			t = ceilf(-abcx.x / a.x);
-			if (t >= 0 && t <= dx){
-				rec[cnt++] = t;
+		int rec[3] = { 0, 0, 0 }, t, cnt = 0;
+		float mint;
+		for (int k = 0; k < 3; k++){
+			if (fabs(a.m128_f32[k]) > EPS){
+				t = ceilf(-abcybase.m128_f32[k] / a.m128_f32[k]);
+				if (t >= 0 && t <= dx){
+					rec[cnt++] = t;
+				}
 			}
 		}
-		if (fabs(a.y) > EPS){
-			t = ceilf(-abcx.y / a.y);
-			if (t >= 0 && t <= dx){
-				rec[cnt++] = t;
-			}
-		}
-		if (fabs(a.z) > EPS){
-			t = ceilf(-abcx.z / a.z);
-			if (t >= 0 && t <= dx){
-				rec[cnt++] = t;
-			}
-		}
+		int start = minx, end = minx;
 		if (rec[0] > rec[1]) std::swap(rec[0], rec[1]);
 		if (cnt == 3){
-			if (rec[1] > rec[2]) std::swap(rec[1], rec[2]);
-			if (rec[0] > rec[1]) std::swap(rec[0], rec[1]);
-			int k = -1;
-			for (k = 0; k < 3; k++){
-				XMStoreFloat4(&tabcCeil, XMVectorAdd(abcyvec, XMVectorScale(va, rec[k])));
-				XMStoreFloat4(&tabcfloor, XMVectorSubtract(XMLoadFloat4(&tabcCeil), va));
-				if (tabcCeil.x >= 0 && tabcCeil.x <= 1.0f &&
-					tabcCeil.y >= 0 && tabcCeil.y <= 1.0f &&
-					tabcCeil.z >= 0 && tabcCeil.z <= 1.0f){
-					if (start < 0){
-						start = minx + rec[k];
-						abcvec = XMLoadFloat4(&tabcCeil);
-					}
-					end = minx + rec[k];
+ 			if (rec[1] > rec[2]) std::swap(rec[1], rec[2]);
+ 			if (rec[0] > rec[1]) std::swap(rec[0], rec[1]);
+			tabcCeil = XMVectorAdd(abcybase, XMVectorScale(a, rec[0]));
+			//int greater = XMVector3GreaterOrEqualR(tabcCeil, { {0.0f,0.0f,0.0f} });
+			//int less = XMVector3GreaterOrEqualR({ { 1.0f, 1.0f, 1.0f } }, tabcCeil);
+			if (INTRIANGLE(tabcCeil)){
+			//if (XMComparisonAllTrue(greater) && XMComparisonAllTrue(less)){
+				tabcfloor = XMVectorAdd(abcybase, XMVectorScale(a, rec[2] - 1));
+				//greater = XMVector3GreaterOrEqualR(tabcfloor, { { 0.0f, 0.0f, 0.0f } });
+				//less = XMVector3GreaterOrEqualR({ { 1.0f, 1.0f, 1.0f } }, tabcfloor);
+				mint = rec[0];
+				if (INTRIANGLE(tabcfloor)){
+				//if (XMComparisonAllTrue(greater) && XMComparisonAllTrue(less)){
+					start += rec[0];
+					end += rec[2];
+					abcx = tabcCeil;
 				}
-				else if (tabcfloor.x >= 0 && tabcfloor.x <= 1.0f &&
-					tabcfloor.y >= 0 && tabcfloor.y <= 1.0f &&
-					tabcfloor.z >= 0 && tabcfloor.z <= 1.0f){
-					end = minx + rec[k];
+				else{
+					start += rec[0];
+					end += rec[1];
+					abcx = tabcCeil;
 				}
 			}
-			if (start < 0){
-				start = end = 0;
+			else{
+				tabcfloor = XMVectorAdd(abcybase, XMVectorScale(a, rec[1]));
+				//greater = XMVector3GreaterOrEqualR(tabcfloor, { { 0.0f, 0.0f, 0.0f } });
+				//less = XMVector3GreaterOrEqualR({ { 1.0f, 1.0f, 1.0f } }, tabcfloor);
+				mint = rec[1];
+				if (INTRIANGLE(tabcfloor)){
+				//if (XMComparisonAllTrue(greater) && XMComparisonAllTrue(less)){
+					start += rec[1];
+					end += rec[2];
+					abcx = tabcfloor;
+				}
 			}
 		}
 		else {
 			mint = rec[0];
 			start = minx + rec[0];
 			end = minx + rec[1];
-			abcvec = XMVectorAdd(abcyvec, XMVectorScale(va, mint));
+			abcx = XMVectorAdd(abcybase, XMVectorScale(a, mint));
 		}
-		
-		for (int j = start; j < end; j++){
-#ifdef ZCORRECT
-			abcz = DirectX::XMVectorDivide(DirectX::XMVectorMultiply(abcvec, XMLoadFloat3(&zz)),
-				DirectX::XMVector3Dot(abcvec, XMLoadFloat3(&zz)));
-			XMStoreFloat2(&tvert.uv, DirectX::XMVector4Transform(abcz, uv));
-			XMStoreFloat4(&tvert.color, DirectX::XMVector4Transform(abcz, rgb));
-#else
-			XMStoreFloat2(&tvert.uv, XMVector4Transform(abcvec, uv));
-			XMStoreFloat4(&tvert.color, XMVector4Transform(abcvec, rgb));
+		if (start != end){
+			zabcX = zabcBaseY + mint * zaScale;
+			zx = zybase + mint * zdx;
+			colorX = XMVectorAdd(colorBasey, XMVectorScale(colorZa, mint));
+			uvX = XMVectorAdd(uvBasey, XMVectorScale(uvZa, mint));
+#ifdef PIXELLIGHT
+			posX = XMVectorAdd(posBasey, XMVectorScale(posZa, mint));
+			normalX = XMVectorAdd(normalBasey, XMVectorScale(normalZa, mint));
 #endif
-			//XMStoreFloat4(&tvert.position, DirectX::XMVector4Transform(XMLoadFloat4(&abcx), pos));
-			//XMStoreFloat4(&tvert.normal, DirectX::XMVector4Transform(XMLoadFloat4(&abcx), normal));
-			tvert.z = XMVector3Dot(abcvec, zvec).m128_f32[0];
-			OutputMerge(PixelShader(tvert), tvert.z, j, i);
-			abcvec = XMVectorAdd(abcvec, va);
+			for (int j = start; j < end; j++){
+				float scale = 1.0f / zabcX, paddingf[3];
+				XMStoreFloat2(&tvert.uv, XMVectorScale(uvX, scale));
+				XMStoreFloat4(&tvert.color, XMVectorScale(colorX, scale));
+#ifdef PIXELLIGHT
+				XMStoreFloat4(&tvert.position, XMVectorScale(posX, scale));
+				XMStoreFloat4(&tvert.normal, XMVectorScale(normalX, scale));
+#endif
+				//zx = XMVector3Dot(abcx, zvec).m128_f32[0];
+				OutputMerge(PixelShader(tvert, scale), zx, j, i);
+				//OutputMerge(texture.BilinearSampler(tvert.uv), zx, j, i);
+				////////////////////////////////////////////////////////////////////
+				zabcX += zaScale;
+				zx += zdx;
+				abcx = XMVectorAdd(abcx, a);
+				uvX = XMVectorAdd(uvX, uvZa);
+				colorX = XMVectorAdd(colorX, colorZa);
+				
+#ifdef PIXELLIGHT
+				posX = XMVectorAdd(posX, posZa);
+				normalX = XMVectorAdd(normalX, normalZa);
+#endif
+			}
 		}
-		abcyvec = XMVectorSubtract(abcyvec, vb);
+		zabcBaseY -= zbScale;
+		zybase -= zdy;
+		abcybase = XMVectorSubtract(abcybase, b);
+		colorBasey = XMVectorSubtract(colorBasey, colorZb);
+		uvBasey = XMVectorSubtract(uvBasey, uvZb);
+#ifdef PIXELLIGHT
+		posBasey = XMVectorSubtract(posBasey, posZb);
+		normalBasey = XMVectorSubtract(normalBasey, normalZb);
+#endif
+		
 	}
 #else
 	//brute force
 	for (int i = maxy; i > miny; i--){
 		for (int j = minx; j < maxx; j++){
-			if (abcx.x >= 0 && abcx.x <= 1.0f &&
-				abcx.y >= 0 && abcx.y <= 1.0f &&
-				abcx.z >= 0 && abcx.z <= 1.0f)
+			if (INTRIANGLE(abcx))
 			{
 				//XMStoreFloat4(&tvert.position, DirectX::XMVector4Transform(XMLoadFloat4(&abcx), pos));
-				//XMStoreFloat4(&tvert.normal, DirectX::XMVector4Transform(XMLoadFloat4(&abcx), normal));				
-				XMStoreFloat2(&tvert.uv, XMVector4Transform(XMLoadFloat4(&abcx), uv));
-				tvert.z = XMVector3Dot(XMLoadFloat4(&abcx), zvec).m128_f32[0];
-				XMStoreFloat4(&tvert.color, XMVector4Transform(XMLoadFloat4(&abcx), rgb));
-				OutputMerge(PixelShader(tvert), tvert.z, j, i);
+				//XMStoreFloat4(&tvert.normal, DirectX::XMVector4Transform(XMLoadFloat4(&abcx), normal));
+				abcz = XMVectorScale(XMVectorMultiply(abcx, zz), 1.0f / zabcX);
+				XMStoreFloat2(&tvert.uv, XMVector4Transform(abcx, uv));
+				XMStoreFloat4(&tvert.color, XMVector4Transform(abcx, rgb));
+				OutputMerge(PixelShader(tvert), XMVector3Dot(abcx, zvec).m128_f32[0], j, i);
 			}
-			XMStoreFloat4(&abcx, XMVectorAdd(XMLoadFloat4(&abcx), va));
+			zabcX += zaScale;
+			abcx =XMVectorAdd(abcx, a);
 		}
-		XMStoreFloat4(&abcybase, XMVectorSubtract(XMLoadFloat4(&abcybase), vb));
+		zabcBaseY -= zbScale;
+		abcybase = XMVectorSubtract(abcybase, b);
 		abcx = abcybase;
 	}
 #endif
