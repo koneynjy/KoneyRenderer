@@ -150,6 +150,7 @@
     <ClInclude Include="Texture.hpp" />
     <ClInclude Include="Timer.hpp" />
     <ClInclude Include="Triangle.hpp" />
+    <ClInclude Include="Util.hpp" />
     <ClInclude Include="Vertex.hpp" />
   </ItemGroup>
   <ItemGroup>

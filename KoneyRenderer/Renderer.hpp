@@ -3,6 +3,7 @@
 #include "Vertex.hpp"
 #include "Triangle.hpp"
 #include "Texture.hpp"
+#include <thread>
 const int maxsize = 1024;
 class Renderer
 {
@@ -12,6 +13,7 @@ public:
 	void SetTriangleBuffer(Triangle * triBuffer, int size);
 	void VertexShader(Vertex & vert);
 	void RasterizeAndOutput(Triangle & triangle);
+	void RasterizeAndOutputIndexed(int i);
 	DirectX::XMFLOAT4 PixelShader(Vertex vin,float z );
 	void OutputMerge(DirectX::XMFLOAT4 c, unsigned short z, int x, int y);
 	void Render();
@@ -41,5 +43,6 @@ public:
 	unsigned *fbdata;
 	unsigned short *zbuffer;
 	unsigned int count;
+	std::thread *t;
 };
 #endif

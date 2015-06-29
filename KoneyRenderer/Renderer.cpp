@@ -1,37 +1,8 @@
 #include "Renderer.hpp"
 #include "Config.hpp"
+#include "Util.hpp"
 #include <assert.h>
 using namespace DirectX;
-#define INTRIANGLE(x)											\
-	(x.m128_f32[0] >= -IMGEPS && x.m128_f32[0] <= 1.0f + IMGEPS&&		\
-	 x.m128_f32[1] >= -IMGEPS && x.m128_f32[1] <= 1.0f + IMGEPS&&		\
-	 x.m128_f32[2] >= -IMGEPS && x.m128_f32[2] <= 1.0f + IMGEPS)
-
-inline float f12(float x1, float y1, float x2, float y2, float x, float y){
-	return (y1 - y2) * x + (x2 - x1) * y + x1 * y2 - x2 * y1;
-}
-
-inline void genCoe(float tmp,
-	float x1, float y1,
-	float x2, float y2,
-	float x, float y,
-	float &a, float &b, float &c){
-	a = (y1 - y2) / tmp;
-	b = (x2 - x1) / tmp;
-	c = (x1 * y2 - x2 * y1) / tmp;
-}
-
-inline float f(float a, float b, float c, int x, int y){
-	return a * x + b * y + c;
-}
-
-inline int myCeilf(float v){
-	float ff = floorf(v);
-	if (v - ff < 0.00001f) return ff;
-	else return (int)ff + 1;
-}
-
-
 
 Renderer::Renderer():fbdata(NULL),zbuffer(NULL){}
 void Renderer::setSize(int width, int height){
@@ -56,6 +27,7 @@ void Renderer::SetTriangleBuffer(Triangle *triBuffer, int size)
 	bSize = size;
 	for (int i = 0; i < bSize; i++)
 		triangleBuffer[i] = triBuffer[i];
+	t = new std::thread[bSize];
 }
 
 __forceinline XMFLOAT4 Renderer::lightShader(Vertex& vert){
@@ -152,12 +124,40 @@ void Renderer::Render(){
 	count = 0;
 	memset(zbuffer, 0xff, sizeof(unsigned short) * fbWidth * fbHeight);
 	memset(fbdata, 0xAA, sizeof(unsigned)* fbWidth * fbHeight);
+// 	for (int i = 0; i < bSize; i++){
+// 		VertexShader(triangleBuffer[i].vert[0]);
+// 		VertexShader(triangleBuffer[i].vert[1]);
+// 		VertexShader(triangleBuffer[i].vert[2]);
+// 		//RasterizeAndOutput(triangleBuffer[i]);
+// 		
+// 		i++;
+// 		VertexShader(triangleBuffer[i].vert[0]);
+// 		VertexShader(triangleBuffer[i].vert[1]);
+// 		VertexShader(triangleBuffer[i].vert[2]);
+// 		//RasterizeAndOutput(triangleBuffer[i]);
+// 		t[0] = std::thread(&Renderer::RasterizeAndOutputIndexed, this, i - 1);
+// 		t[1] = std::thread(&Renderer::RasterizeAndOutputIndexed, this, i);
+// 
+// 		t[0].join();
+// 		t[1].join();
+// 	}
 	for (int i = 0; i < bSize; i++){
 		VertexShader(triangleBuffer[i].vert[0]);
 		VertexShader(triangleBuffer[i].vert[1]);
 		VertexShader(triangleBuffer[i].vert[2]);
-		RasterizeAndOutput(triangleBuffer[i]);
 	}
+
+	for (int i = 0; i < bSize; i++){
+		t[i] = std::thread(&Renderer::RasterizeAndOutputIndexed, this, i);
+	}
+
+	for (int i = 0; i < bSize; i++){
+		t[i].join();
+	}
+}
+
+void Renderer::RasterizeAndOutputIndexed(int i){
+	RasterizeAndOutput(triangleBuffer[i]);
 }
 
 void Renderer::RasterizeAndOutput(Triangle & triangle){
@@ -190,25 +190,29 @@ void Renderer::RasterizeAndOutput(Triangle & triangle){
 	XMVECTOR hsVec = { hScale, hScale, hScale };
 	XMVECTOR wcVec = { wCor, wCor, wCor };
 	XMVECTOR hcVec = { hCor, hCor, hCor };
-
 	//to image coord
 	X = XMVectorMultiplyAdd(X, wsVec, wcVec);
 	Y = XMVectorMultiplyAdd(Y, hsVec, hcVec);
-	//coeff
-	XMVECTOR a, b, c;
+////////////////////////////////////for raterization////////////////////////////
+ 	double dbX[3] = { X.m128_f32[0], X.m128_f32[1], X.m128_f32[2] };
+ 	double dbY[3] = { Y.m128_f32[0], Y.m128_f32[1], Y.m128_f32[2] };
+	double ddX[3] = { dbX[1] - dbX[2], dbX[2] - dbX[0], dbX[0] - dbX[1] };
+	double ddY[3] = { dbY[1] - dbY[2], dbY[2] - dbY[0], dbY[0] - dbY[1] };
+	double ddXY[3] = {
+		dbX[1] * dbY[2] - dbX[2] * dbY[1],
+		dbX[2] * dbY[0] - dbX[0] * dbY[2],
+		dbX[0] * dbY[1] - dbX[1] * dbY[0]
+	};
+	
 //	double a0, a1, a2, b0, b1, b2, c0, c1, c2;
-	double area = f12(X.m128_f32[0], Y.m128_f32[0], X.m128_f32[1], Y.m128_f32[1], X.m128_f32[2], Y.m128_f32[2]);
-	if (fabs(area) < EPS) return;
-	genCoe(area, X.m128_f32[1], Y.m128_f32[1], X.m128_f32[2], Y.m128_f32[2], X.m128_f32[0], Y.m128_f32[0], a.m128_f32[0], b.m128_f32[0], c.m128_f32[0]);
-	genCoe(area, X.m128_f32[2], Y.m128_f32[2], X.m128_f32[0], Y.m128_f32[0], X.m128_f32[1], Y.m128_f32[1], a.m128_f32[1], b.m128_f32[1], c.m128_f32[1]);
-	genCoe(area, X.m128_f32[0], Y.m128_f32[0], X.m128_f32[1], Y.m128_f32[1], X.m128_f32[2], Y.m128_f32[2], a.m128_f32[2], b.m128_f32[2], c.m128_f32[2]);
+/////////////////////////////////////for barycentric/////////////////////
+	XMVECTOR a, b, c;
+	double area = f12(ddX[0], ddY[0], ddXY[0], dbX[0], dbY[0]);
+	if (abs(area) < EPS) return;
+	genCoe(area, ddX[0], ddY[0], ddXY[0], X.m128_f32[0], Y.m128_f32[0], a.m128_f32[0], b.m128_f32[0], c.m128_f32[0]);
+	genCoe(area, ddX[1], ddY[1], ddXY[1], X.m128_f32[1], Y.m128_f32[1], a.m128_f32[1], b.m128_f32[1], c.m128_f32[1]);
+	genCoe(area, ddX[2], ddY[2], ddXY[2], X.m128_f32[2], Y.m128_f32[2], a.m128_f32[2], b.m128_f32[2], c.m128_f32[2]);
 
-// 	genCoe(area, X.m128_f32[1], Y.m128_f32[1], X.m128_f32[2], Y.m128_f32[2], X.m128_f32[0], Y.m128_f32[0], a0, b0, c0);
-// 	genCoe(area, X.m128_f32[2], Y.m128_f32[2], X.m128_f32[0], Y.m128_f32[0], X.m128_f32[1], Y.m128_f32[1], a1, b1, c1);
-// 	genCoe(area, X.m128_f32[0], Y.m128_f32[0], X.m128_f32[1], Y.m128_f32[1], X.m128_f32[2], Y.m128_f32[2], a2, b2, c2);
-// 	XMVECTOR a = { a0, a1, a2 };
-// 	XMVECTOR b = { b0, b1, b2 };
-// 	XMVECTOR c = { c0, c1, c2 };;
 	//get bounding box
 	int maxx = (int)ceilf(max(max(X.m128_f32[0], X.m128_f32[1]), X.m128_f32[2]));
 	int maxy = (int)floorf(max(max(Y.m128_f32[0], Y.m128_f32[1]), Y.m128_f32[2]));
@@ -263,31 +267,59 @@ void Renderer::RasterizeAndOutput(Triangle & triangle){
 
 	float zabcBaseY =		XMVector3Dot(zz, abcybase).m128_f32[0], zabcX = zabcBaseY;
 	float zaScale =			XMVector3Dot(zz, a).m128_f32[0], zbScale = XMVector3Dot(zz, b).m128_f32[0];
+//////////////////////////////////////////// end barycentric//////////////////////////////////////////	
 	XMVECTOR tabcfloor, tabcCeil;
 	XMVECTOR abcz;
 	Vertex tvert;
+// 	XMVECTOR Cy = {
+// 		-f12(ddX[0], ddY[0], ddXY[0], minx, maxy),
+// 		-f12(ddX[1], ddY[1], ddXY[1], minx, maxy),
+// 		-f12(ddX[2], ddY[2], ddXY[2], minx, maxy)
+// 	};
+// 	XMVECTOR Cx;
 #ifdef SCANLINE
+	double cY[3]  = {
+		-f12(ddX[0], ddY[0], ddXY[0], minx, maxy),
+		-f12(ddX[1], ddY[1], ddXY[1], minx, maxy),
+		-f12(ddX[2], ddY[2], ddXY[2], minx, maxy)
+	}, cX[3];
+	double interBase[3], interdy[3];
+	int icnt = 0;
+	for (int k = 0; k < 3; k++){
+		if (abs(ddY[k]) > EPS){
+			interdy[icnt] = ddX[k] / ddY[k];
+			interBase[icnt] = interdy[icnt] * maxy - ddXY[k] / ddY[k];
+			icnt++;
+		}
+	}
 	for (int i = maxy; i > miny; i--){
 		int rec[3] = { 0, 0, 0 }, t, cnt = 0;
 		float mint;
-		for (int k = 0; k < 3; k++){
-			if (fabs(a.m128_f32[k]) > EPS){
-				float vf = -abcybase.m128_f32[k] / a.m128_f32[k];			
-// 				float ff = floorf(vf);
-// 				XMVECTOR cv = XMVectorAdd(abcybase, XMVectorScale(a, cf));
-// 				XMVECTOR fv = XMVectorAdd(abcybase, XMVectorScale(a, ff));
-// 				if (INTRIANGLE(cv) && INTRIANGLE(fv)){
-// 					cf = ff;
+// 		for (int k = 0; k < 3; k++){
+// 			if (fabs(a.m128_f32[k]) > EPS){
+// 				float vf = -abcybase.m128_f32[k] / a.m128_f32[k];	
+// 				interBase[cnt] = vf + minx;
+// // 				float ff = floorf(vf);
+// // 				XMVECTOR cv = XMVectorAdd(abcybase, XMVectorScale(a, cf));
+// // 				XMVECTOR fv = XMVectorAdd(abcybase, XMVectorScale(a, ff));
+// // 				if (INTRIANGLE(cv) && INTRIANGLE(fv)){
+// // 					cf = ff;
+// // 				}
+// //				t = cf;
+// // 				if (fabs(ff * a.m128_f32[k] - abcybase.m128_f32[k]) < 0.001f)
+// // 					t = ff;
+// // 				else t = (int)ff + 1;
+// 				t = ceilf(vf);
+// 				if (t >= 0 && t <= dx){
+// 					rec[cnt++] = t;
 // 				}
-//				t = cf;
-// 				if (fabs(ff * a.m128_f32[k] - abcybase.m128_f32[k]) < 0.001f)
-// 					t = ff;
-// 				else t = (int)ff + 1;
-				t = ceilf(vf);
-				if (t >= 0 && t <= dx){
-					rec[cnt++] = t;
-				}
-			}
+// 			}
+// 		}
+//		int start = minx, end = minx;
+
+		for (int k = 0; k < icnt; k++){
+			t = ceil(interBase[k]);
+			if (t >= minx && t <= maxx) rec[cnt++] = t - minx;
 		}
 		int start = minx, end = minx;
 		if (rec[0] > rec[1]) std::swap(rec[0], rec[1]);
@@ -326,12 +358,7 @@ void Renderer::RasterizeAndOutput(Triangle & triangle){
 			end = minx + rec[1];
 			abcx = XMVectorAdd(abcybase, XMVectorScale(a, mint));
 		}
-		XMVECTOR sv = XMVectorSubtract(abcx, a);
 		if (start != end){
-			//end++;
-			if(!check(start - 1, i) && check(start - 2, i)){
-				start++;
-			}
 #ifdef XCULL
 			if (start < 0){
 				mint = -minx;
@@ -351,11 +378,11 @@ void Renderer::RasterizeAndOutput(Triangle & triangle){
 			for (int j = start; j < end; j++){
 				float scale = 1.0f / zabcX, paddingf[3];
 				XMStoreFloat2(&tvert.uv, XMVectorScale(uvX, scale));
-				//XMStoreFloat4(&tvert.color, XMVectorScale(colorX, scale));
-				if (j == start) tvert.color = { 1.0f, 0.0f, 0.0f, 0.0f };
-				else if (j == end - 1) tvert.color = { 0.0f, 0.0f, 0.0f, 0.0f };
-				else if (cnt == 3) tvert.color = { 0.0f, 1.0f, 0.0f,0.0f };
-				else tvert.color = { 0.0f, 0.0f, 1.0f, 0.0f };
+				XMStoreFloat4(&tvert.color, XMVectorScale(colorX, scale));
+// 				if (j == start) tvert.color = { 1.0f, 0.0f, 0.0f, 0.0f };
+// 				else if (j == end - 1) tvert.color = { 0.0f, 0.0f, 0.0f, 0.0f };
+// 				else if (cnt == 3) tvert.color = { 0.0f, 1.0f, 0.0f,0.0f };
+// 				else tvert.color = { 0.0f, 0.0f, 1.0f, 0.0f };
 #ifdef PIXELLIGHT
 				XMStoreFloat4(&tvert.position, XMVectorScale(posX, scale));
 				XMStoreFloat4(&tvert.normal, XMVectorScale(normalX, scale));
@@ -385,7 +412,9 @@ void Renderer::RasterizeAndOutput(Triangle & triangle){
 		posBasey = XMVectorSubtract(posBasey, posZb);
 		normalBasey = XMVectorSubtract(normalBasey, normalZb);
 #endif
-		
+		for (int k = 0; k < icnt; k++){
+			interBase[k] -= interdy[k];
+		}
 	}
 #else
 	//brute force
@@ -394,6 +423,7 @@ void Renderer::RasterizeAndOutput(Triangle & triangle){
 	maxx = min(maxx, fbW);
 #endif
 	for (int i = maxy; i > miny; i--){
+		Cx = Cy;
 		zabcX = zabcBaseY;
 		zx = zybase;
 		abcx = abcybase;
@@ -405,7 +435,7 @@ void Renderer::RasterizeAndOutput(Triangle & triangle){
 #endif
 		bool in = false;
 		for (int j = minx; j < maxx; j++){
-			if (INTRIANGLE(abcx))
+			if (INTRIANGLE(Cx))
 			{
 				in = true;
 				float  scale = 1.0f / zabcX;
@@ -418,6 +448,7 @@ void Renderer::RasterizeAndOutput(Triangle & triangle){
 				OutputMerge(PixelShader(tvert, scale), zx, j, i);
 			}
 			else if(in) break;
+			Cx = XMVectorSubtract(Cx, dY);
 			zabcX += zaScale;
 			zx += zdx;
 			abcx = XMVectorAdd(abcx, a);
@@ -428,6 +459,7 @@ void Renderer::RasterizeAndOutput(Triangle & triangle){
 			normalX = XMVectorAdd(normalX, normalZa);
 #endif
 		}
+		Cy = XMVectorSubtract(Cy, dX);
 		zabcBaseY -= zbScale;
 		zybase -= zdy;
 		abcybase = XMVectorSubtract(abcybase, b);

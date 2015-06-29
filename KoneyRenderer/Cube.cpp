@@ -1,7 +1,7 @@
 #include "App.hpp"
 using namespace std;
 using namespace DirectX;
-
+const float  length = 3.5f;
 class CubeApp : public App
 {
 public:
@@ -85,9 +85,9 @@ void CubeApp::updateScene(float dt)
 
 	// Convert Spherical to Cartesian coordinates: mPhi measured from +y
 	// and mTheta measured counterclockwise from -z.
-	float x = 7.0f*sinf(mPhi)*sinf(mTheta);
-	float z = -7.0f*sinf(mPhi)*cosf(mTheta);
-	float y = 7.0f*cosf(mPhi);
+	float x = length*sinf(mPhi)*sinf(mTheta);
+	float z = -length*sinf(mPhi)*cosf(mTheta);
+	float y = length*cosf(mPhi);
 	// Build the view matrix.
 	XMVECTOR pos = { x, y, z, 1.0f };
 	XMVECTOR target = { 0.0f, 0.0f, 0.0f, 1.0f };
