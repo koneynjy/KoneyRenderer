@@ -40,7 +40,7 @@ void Texture::Load(string path){
 	fseek(fpBmp, bmpHeader.bfOffBits, 0);
 	fread(data, 1, size, fpBmp);
 	
-	bmpData = (float*)_aligned_malloc((width + 1)  * (height + 1) * 4 * sizeof(float), 16);
+	bmpData = new float[(width + 1)  * (height + 1) * 4];
 	int d1 = 0, d2 = 0, w1 = width * 3, w2 = (width + 1) << 2;
 	for (int i = 0; i < height; i++){
 		int id1 = d1, id2 = d2;
@@ -88,10 +88,12 @@ void Texture::Load(string path){
 }
 
 Texture::~Texture(){
-	if(bmpData) delete[] bmpData;
-	if (mipSize){
-		for (int i = 0; i < mipSize; i++)
-			delete[] mipmap[i];
+ 	if (mipSize){
+ 		for (int i = 0; i < mipSize; i++)
+ 			delete[] mipmap[i];
+	}
+	else{
+		if (bmpData) delete[] bmpData;
 	}
 }
 

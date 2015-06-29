@@ -2,7 +2,6 @@
 #define _TEXTURE
 #include "Globel.hpp"
 #include <string>
-#include <cmath>
 class Texture{
 public:
 	Texture();

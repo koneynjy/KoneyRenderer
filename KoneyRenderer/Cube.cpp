@@ -74,10 +74,10 @@ void CubeApp::updateScene(float dt)
 	App::updateScene(dt);
 
 	// Update angles based on input to orbit camera around box.
-	if (GetAsyncKeyState('A') & 0x8000)	mTheta -= 2.0f*dt;
-	if (GetAsyncKeyState('D') & 0x8000)	mTheta += 2.0f*dt;
-	if (GetAsyncKeyState('W') & 0x8000)	mPhi -= 2.0f*dt;
-	if (GetAsyncKeyState('S') & 0x8000)	mPhi += 2.0f*dt;
+	if (GetAsyncKeyState('A') & 0x8000)	mTheta -= 1.0f*dt;
+	if (GetAsyncKeyState('D') & 0x8000)	mTheta += 1.0f*dt;
+	if (GetAsyncKeyState('W') & 0x8000)	mPhi -= 1.0f*dt;
+	if (GetAsyncKeyState('S') & 0x8000)	mPhi += 1.0f*dt;
 
 	// Restrict the angle mPhi.
 	if (mPhi < 0.1f)	mPhi = 0.1f;
@@ -85,9 +85,9 @@ void CubeApp::updateScene(float dt)
 
 	// Convert Spherical to Cartesian coordinates: mPhi measured from +y
 	// and mTheta measured counterclockwise from -z.
-	float x = 6.0f*sinf(mPhi)*sinf(mTheta);
-	float z = -6.0f*sinf(mPhi)*cosf(mTheta);
-	float y = 6.0f*cosf(mPhi);
+	float x = 7.0f*sinf(mPhi)*sinf(mTheta);
+	float z = -7.0f*sinf(mPhi)*cosf(mTheta);
+	float y = 7.0f*cosf(mPhi);
 	// Build the view matrix.
 	XMVECTOR pos = { x, y, z, 1.0f };
 	XMVECTOR target = { 0.0f, 0.0f, 0.0f, 1.0f };
@@ -134,12 +134,12 @@ void CubeApp::initVertex(){
 void CubeApp::initTriangle()
 {
 	triangle[0].vert[0] = { point[0], {}, normal[0], { 0.0f, 0.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
-	triangle[0].vert[1] = { point[1], {}, normal[0], { 1.0f, 0.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
-	triangle[0].vert[2] = { point[2], {}, normal[0], { 0.0f, 1.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
+	triangle[0].vert[1] = { point[1], {}, normal[0], { 1.0f, 0.0f }, {}, { 0.0f, 1.0f, 0.0f, 0.0f } };
+	triangle[0].vert[2] = { point[2], {}, normal[0], { 0.0f, 1.0f }, {}, { 0.0f, 0.0f, 1.0f, 0.0f } };
 
 	triangle[1].vert[0] = { point[2], {}, normal[0], { 0.0f, 1.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
-	triangle[1].vert[1] = { point[1], {}, normal[0], { 1.0f, 0.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
-	triangle[1].vert[2] = { point[3], {}, normal[0], { 1.0f, 1.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
+	triangle[1].vert[1] = { point[1], {}, normal[0], { 1.0f, 0.0f }, {}, { 0.0f, 1.0f, 0.0f, 0.0f } };
+	triangle[1].vert[2] = { point[3], {}, normal[0], { 1.0f, 1.0f }, {}, { 0.0f, 0.0f, 1.0f, 0.0f } };
 
 	triangle[2].vert[0] = { point[1], {}, normal[3], { 0.0f, 0.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
 	triangle[2].vert[1] = { point[5], {}, normal[3], { 1.0f, 0.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };

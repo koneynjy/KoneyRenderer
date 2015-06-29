@@ -5,7 +5,7 @@
 #include <DirectXColors.h>
 #include <iostream>
 #define PI (3.1415926f)
-#define EPS (1e-7)
+#define EPS (1e-6)
 #define NOTEX
 
 #endif
