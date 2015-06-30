@@ -7,24 +7,27 @@
 	 x.m128_f32[2] >= -IMGEPS )
 
 
-inline float f12(float dx, float dy, float dxy, float x, float y){
+__forceinline float f12(float dx, float dy, float dxy, float x, float y){
 	return dy * x - dx * y + dxy;
 }
 
-inline double f12(double dx, double dy, double dxy, double x, double y){
+__forceinline double f12(double dx, double dy, double dxy, double x, double y){
 	return dy * x - dx * y + dxy;
 }
 
-inline float quickPow(float a, int b){
-	float c = 1.0f, d = a;
-	while (b > 0){
-		if (b & 1)
-			c *= d;
-		b = b >> 1;
-		d = d * d;
+__forceinline float quickPow(float a, int b){
+	float c = 1.0f, d[] = { 1.0f, a };
+	//float d = a;
+	while (b){
+		//if (b & 1)
+		c *= d[b&1];
+		b >>= 1;
+		d[1] *= d[1];
 	}
 	return c;
 }
+
+
 const int nSize = 200;
 const int lutSize = 0x10000;
 const float lutsf = lutSize - 1;
@@ -38,7 +41,7 @@ void initLUT(int n){
 	}
 }
 
-inline float lutPow(float a, int b){
+__forceinline float lutPow(float a, int b){
 	return pLUT[int(a * lutsf)];
 }
 
@@ -51,7 +54,7 @@ inline float lutPow(float a, int b){
 // 	c = dxy / tmp;
 // }
 
-inline void genCoe(double tmp,
+__forceinline void genCoe(double tmp,
 	double dx, double dy, double dxy,
 	double x, double y,
 	float &a, float &b, float &c){
@@ -62,7 +65,7 @@ inline void genCoe(double tmp,
 
 
 
-inline void genCoe(float tmp,
+__forceinline void genCoe(float tmp,
 	float x1, float y1,
 	float x2, float y2,
 	float x, float y,
@@ -72,7 +75,7 @@ inline void genCoe(float tmp,
 	c = (x1 * y2 - x2 * y1) / tmp;
 }
 
-inline float f(float a, float b, float c, int x, int y){
+__forceinline float f(float a, float b, float c, int x, int y){
 	return a * x + b * y + c;
 }
 

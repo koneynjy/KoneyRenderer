@@ -3,7 +3,7 @@
 
 #define IMGEPS 1e-4
 #define MULTITHREAD
-#define THREAD_COUNT 8
+#define THREAD_COUNT 16
 //#define ROTATE
 #define CULL_BACK
 #define SCANLINE
@@ -11,7 +11,7 @@
 //#define VERTEXLIGHT
 #define PIXELLIGHT
 #define SPECULAR
-#define TEXTURE
+//#define TEXTURE
 #define BILINEAR
 #define YCULL
 #define XCULL

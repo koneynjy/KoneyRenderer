@@ -74,7 +74,7 @@ void Renderer::VertexShader(Vertex& vert){
 #ifdef VERTEXLIGHT
 	vert.pcolor = lightShader(vert);
 #else
-	vert.pcolor = vert.color;
+	vert.pcolor = colorOverRide;
 #endif
 	
 	
@@ -267,28 +267,6 @@ void Renderer::RasterizeAndOutput(Triangle & triangle){
 	for (int i = maxy; i > miny; i--){
 		int rec[3] = { 0, 0, 0 }, t, cnt = 0;
 		float mint;
-// 		for (int k = 0; k < 3; k++){
-// 			if (fabs(a.m128_f32[k]) > EPS){
-// 				float vf = -abcybase.m128_f32[k] / a.m128_f32[k];	
-// 				interBase[cnt] = vf + minx;
-// // 				float ff = floorf(vf);
-// // 				XMVECTOR cv = XMVectorAdd(abcybase, XMVectorScale(a, cf));
-// // 				XMVECTOR fv = XMVectorAdd(abcybase, XMVectorScale(a, ff));
-// // 				if (INTRIANGLE(cv) && INTRIANGLE(fv)){
-// // 					cf = ff;
-// // 				}
-// //				t = cf;
-// // 				if (fabs(ff * a.m128_f32[k] - abcybase.m128_f32[k]) < 0.001f)
-// // 					t = ff;
-// // 				else t = (int)ff + 1;
-// 				t = ceilf(vf);
-// 				if (t >= 0 && t <= dx){
-// 					rec[cnt++] = t;
-// 				}
-// 			}
-// 		}
-//		int start = minx, end = minx;
-
 		for (int k = 0; k < icnt; k++){
 			t = ceil(interBase[k]);
 			if (t >= minx && t <= maxx) rec[cnt++] = t - minx;

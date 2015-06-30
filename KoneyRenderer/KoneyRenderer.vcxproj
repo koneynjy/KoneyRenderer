@@ -147,6 +147,7 @@
     <ClInclude Include="App.hpp" />
     <ClInclude Include="Config.hpp" />
     <ClInclude Include="Globel.hpp" />
+    <ClInclude Include="Scene.hpp" />
     <ClInclude Include="Renderer.hpp" />
     <ClInclude Include="Texture.hpp" />
     <ClInclude Include="Timer.hpp" />

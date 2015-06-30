@@ -1,7 +1,7 @@
 #include "App.hpp"
 using namespace std;
 using namespace DirectX;
-const float  length = 3.0f;
+const float  length = 3.5f;
 class CubeApp : public App
 {
 public:

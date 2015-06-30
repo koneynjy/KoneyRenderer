@@ -35,6 +35,7 @@ public:
 	DirectX::XMFLOAT3 aColor = { 0.2f, 0.2f, 0.2f };
 	DirectX::XMFLOAT3 eyePos;
 	DirectX::XMFLOAT3 spec = {1.0f,1.0f,1.0f};
+	DirectX::XMFLOAT4 colorOverRide = {0.5f,0.5f,0.5f,0.0f};
 	int n = 60;
 	float nf = 60.0f;
 	Texture texture;
