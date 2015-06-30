@@ -1,7 +1,9 @@
 #ifndef _CONFIG
 #define _CONFIG
 
-#define IMGEPS 1e-5
+#define IMGEPS 1e-4
+#define MULTITHREAD
+#define THREAD_COUNT 8
 //#define ROTATE
 #define CULL_BACK
 #define SCANLINE
@@ -10,7 +12,7 @@
 #define PIXELLIGHT
 #define SPECULAR
 #define TEXTURE
-#define BILINEAR
+//#define BILINEAR
 #define YCULL
 #define XCULL
 //#define TRILINEAR

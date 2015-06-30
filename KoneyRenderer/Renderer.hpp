@@ -17,6 +17,9 @@ public:
 	DirectX::XMFLOAT4 PixelShader(Vertex vin,float z );
 	void OutputMerge(DirectX::XMFLOAT4 c, unsigned short z, int x, int y);
 	void Render();
+	void RasterizeLine(int sy, int ey);
+	void RasterizeMultiThread(Triangle& triangle);
+	void RasterizeMultiThreadIndexed(int i);
 	void setSize(int width, int height);
 	DirectX::XMFLOAT4 lightShader(Vertex& vert);
 	inline bool check(int x, int y){
@@ -32,7 +35,7 @@ public:
 	DirectX::XMFLOAT3 aColor = { 0.2f, 0.2f, 0.2f };
 	DirectX::XMFLOAT3 eyePos;
 	DirectX::XMFLOAT3 spec = {1.0f,1.0f,1.0f};
-	float n = 160.0f;
+	int n = 60;
 	Texture texture;
 	int bSize,padding;
 	int fbWidth, fbHeight;
