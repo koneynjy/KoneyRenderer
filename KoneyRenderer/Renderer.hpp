@@ -14,14 +14,14 @@ public:
 	void VertexShader(Vertex & vert);
 	void RasterizeAndOutput(Triangle & triangle);
 	void RasterizeAndOutputIndexed(int i);
-	DirectX::XMFLOAT4 PixelShader(Vertex vin,float z );
-	void OutputMerge(DirectX::XMFLOAT4 c, unsigned short z, int x, int y);
+	DirectX::XMVECTOR PixelShader(Vertex& vin,float z );
+	void OutputMerge(DirectX::XMVECTOR c, unsigned short z, int x, int y);
 	void Render();
 	void RasterizeLine(int sy, int ey);
 	void RasterizeMultiThread(Triangle& triangle);
 	void RasterizeMultiThreadIndexed(int i);
 	void setSize(int width, int height);
-	DirectX::XMFLOAT4 lightShader(Vertex& vert);
+	DirectX::XMVECTOR lightShader(Vertex& vert);
 	inline bool check(int x, int y){
 		int idx = y * fbWidth + x;
 		return fbdata[idx] != 0xAAAAAAAA;
@@ -29,13 +29,13 @@ public:
 	Triangle triangleBuffer[1024];
 	DirectX::XMMATRIX mvp;
 	DirectX::XMMATRIX mw;
-	DirectX::XMFLOAT3 light = { -0.57735f, 0.57735f, 0.57735f };
-	DirectX::XMFLOAT3 lightPoint = {2.0f,2.0f,2.0f};
-	DirectX::XMFLOAT3 lightColor = {1.0f, 1.0f, 1.0f };
-	DirectX::XMFLOAT3 aColor = { 0.2f, 0.2f, 0.2f };
-	DirectX::XMFLOAT3 eyePos;
-	DirectX::XMFLOAT3 spec = {1.0f,1.0f,1.0f};
-	DirectX::XMFLOAT4 colorOverRide = {0.5f,0.5f,0.5f,0.0f};
+	DirectX::XMVECTOR light ;
+	DirectX::XMVECTOR lightPoint;
+	DirectX::XMVECTOR lightColor;
+	DirectX::XMVECTOR aColor;
+	DirectX::XMVECTOR eyePos;
+	DirectX::XMVECTOR spec;
+	DirectX::XMVECTOR colorOverRide;
 	int n = 60;
 	float nf = 60.0f;
 	Texture texture;

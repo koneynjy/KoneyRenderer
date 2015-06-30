@@ -11,7 +11,7 @@
 //#define VERTEXLIGHT
 #define PIXELLIGHT
 #define SPECULAR
-//#define TEXTURE
+#define TEXTURE
 #define BILINEAR
 #define YCULL
 #define XCULL

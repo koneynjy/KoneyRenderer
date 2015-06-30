@@ -40,7 +40,8 @@ void Texture::Load(string path){
 	fseek(fpBmp, bmpHeader.bfOffBits, 0);
 	fread(data, 1, size, fpBmp);
 	
-	bmpData = new float[(width + 1)  * (height + 1) * 4];
+	//bmpData = new float[(width + 1)  * (height + 1) * 4];
+	bmpData = (float*)_aligned_malloc(sizeof(float) * (width + 1) * (height + 1) * 4, 16);
 	int d1 = 0, d2 = 0, w1 = width * 3, w2 = (width + 1) << 2;
 	for (int i = 0; i < height; i++){
 		int id1 = d1, id2 = d2;
@@ -90,10 +91,10 @@ void Texture::Load(string path){
 Texture::~Texture(){
  	if (mipSize){
  		for (int i = 0; i < mipSize; i++)
- 			delete[] mipmap[i];
+			_aligned_free(mipmap[i]);
 	}
 	else{
-		if (bmpData) delete[] bmpData;
+		if (bmpData) _aligned_free(bmpData);
 	}
 }
 
@@ -113,7 +114,8 @@ void Texture::GenMipmap(){
 		mipHeight[mipSize] = mipHeight[preMip] >> 1;
 		mipH[mipSize] = mipHeight[mipSize] - 1;
 		mipBiWidth[mipSize] = mipWidth[mipSize] + 1;
-		mipmap[mipSize] = new float[(mipWidth[mipSize] + 1) * (mipHeight[mipSize] + 1)<< 2];//puls one for bilinear filter
+		//mipmap[mipSize] = new float[(mipWidth[mipSize] + 1) * (mipHeight[mipSize] + 1)<< 2];//puls one for bilinear filter
+		mipmap[mipSize] = (float*) _aligned_malloc(sizeof(float) * (mipWidth[mipSize] + 1) * (mipHeight[mipSize] + 1) << 2, 16);//puls one for bilinear filter
 		int dy = mipBiWidth[mipSize] << 2,dx = 4, ybase = 0, x = 0;
 		int dyup = mipBiWidth[preMip] << 2;
 		for (int i = 0; i < mipHeight[mipSize]; i++){

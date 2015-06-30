@@ -3,12 +3,12 @@
 #include "Globel.hpp"
 struct Vertex{
 public:
-	DirectX::XMFLOAT4 position;
-	DirectX::XMFLOAT4 positionH;
-	DirectX::XMFLOAT4 normal;
-	DirectX::XMFLOAT2 uv;
+	DirectX::XMVECTOR position;
+	DirectX::XMVECTOR positionH;
+	DirectX::XMVECTOR normal;
+	DirectX::XMVECTOR uv;
 	int padding[2];
-	DirectX::XMFLOAT4 color;
-	DirectX::XMFLOAT4 pcolor;
+	DirectX::XMVECTOR color;
+	DirectX::XMVECTOR pcolor;
 };
 #endif

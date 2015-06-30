@@ -9,44 +9,41 @@ public:
 	~Texture();
 	void Load(std::string);
 	void GenMipmap();
-	__forceinline DirectX::XMFLOAT4 NearestSampler(DirectX::XMFLOAT2& uv){
-		int wi = w * uv.x, he = h * uv.y;
-		return *((DirectX::XMFLOAT4*)(bmpData) + biwidth * he + wi);
+	__forceinline DirectX::XMVECTOR NearestSampler(DirectX::XMVECTOR& uv){
+		int wi = w * uv.m128_f32[0], he = h * uv.m128_f32[1];
+		return *((DirectX::XMVECTOR*)(bmpData)+biwidth * he + wi);
 	}
 
-	__forceinline DirectX::XMFLOAT4 BilinearSampler(DirectX::XMFLOAT2& uv){
-		float wf = w * uv.x, hf = h * uv.y;
+	__forceinline DirectX::XMVECTOR BilinearSampler(DirectX::XMVECTOR& uv){
+		float wf = w * uv.m128_f32[0], hf = h * uv.m128_f32[1];
 		int wi = wf, hi = hf;
 		float lerpx = wf - wi, lerpy = hf - hi;
-		DirectX::XMFLOAT4* pd = (DirectX::XMFLOAT4*)(bmpData) + biwidth * hi + wi, *pu = pd + biwidth;
-		DirectX::XMFLOAT4 ret;
-		XMStoreFloat4(&ret, DirectX::XMVectorLerp(
-			DirectX::XMVectorLerp(XMLoadFloat4(pd), XMLoadFloat4(pd + 1), lerpx),
-			DirectX::XMVectorLerp(XMLoadFloat4(pu), XMLoadFloat4(pu + 1), lerpx),
-			lerpy));
-		return ret;
+		DirectX::XMVECTOR* pd = (DirectX::XMVECTOR*)(bmpData)+biwidth * hi + wi, *pu = pd + biwidth;
+		return DirectX::XMVectorLerp(
+			DirectX::XMVectorLerp(*pd, *(pd + 1), lerpx),
+			DirectX::XMVectorLerp(*pu, *(pu + 1), lerpx),
+			lerpy);
 	}
 
-	__forceinline DirectX::XMFLOAT4 MipMapNearestSampler(DirectX::XMFLOAT2& uv, int z){
-		int wi = mipW[z] * uv.x, he = mipH[z] * uv.y;
-		return *((DirectX::XMFLOAT4*)(mipmap[z])+mipBiWidth[z] * he + wi);
+	__forceinline DirectX::XMVECTOR MipMapNearestSampler(DirectX::XMVECTOR& uv, int z){
+		int wi = mipW[z] * uv.m128_f32[0], he = mipH[z] * uv.m128_f32[1];
+		return *((DirectX::XMVECTOR*)(mipmap[z]) + mipBiWidth[z] * he + wi);
 	}
 
-	__forceinline DirectX::XMFLOAT4 MipMapNearestSampler(DirectX::XMFLOAT2& uv, float z){
+	__forceinline DirectX::XMVECTOR MipMapNearestSampler(DirectX::XMVECTOR& uv, float z){
 		int zz = z / zThreshold * mipS;
 		zz = zz > mipS ? mipS : zz;
 		return MipMapNearestSampler(uv, zz);
 	}
 
-	__forceinline DirectX::XMVECTOR MipMapBilinearSampler(DirectX::XMFLOAT2& uv, int z){
-		float wf = mipW[z] * uv.x, hf = mipH[z] * uv.y;
+	__forceinline DirectX::XMVECTOR MipMapBilinearSampler(DirectX::XMVECTOR& uv, int z){
+		float wf = mipW[z] * uv.m128_f32[0], hf = mipH[z] * uv.m128_f32[1];
 		int wi = wf, hi = hf;
 		float lerpx = wf - wi, lerpy = hf - hi;
-		DirectX::XMFLOAT4* pd = (DirectX::XMFLOAT4*)(mipmap[z]) + mipBiWidth[z] * hi + wi, *pu = pd + mipBiWidth[z];
-		DirectX::XMFLOAT4 ret;
+		DirectX::XMVECTOR* pd = (DirectX::XMVECTOR*)(mipmap[z]) + mipBiWidth[z] * hi + wi, *pu = pd + mipBiWidth[z];
 		return DirectX::XMVectorLerp(
-			DirectX::XMVectorLerp(XMLoadFloat4(pd), XMLoadFloat4(pd + 1), lerpx),
-			DirectX::XMVectorLerp(XMLoadFloat4(pu), XMLoadFloat4(pu + 1), lerpx),
+			DirectX::XMVectorLerp(*pd, *(pd + 1), lerpx),
+			DirectX::XMVectorLerp(*pu, *(pu + 1), lerpx),
 			lerpy);
 	}
 
@@ -57,18 +54,17 @@ public:
 	}
 
 
-	DirectX::XMFLOAT4 TrilinearSampler(DirectX::XMFLOAT2& uv, float z){
+	DirectX::XMVECTOR TrilinearSampler(DirectX::XMFLOAT2& uv, float z){
 		float zz = z / zThreshold * mipS;
 		int zi = zz;
 		DirectX::XMFLOAT4 ret;
-		if (zi == mipS) XMStoreFloat4(&ret, MipMapBilinearSampler(uv, zi));
+		if (zi == mipS) return MipMapBilinearSampler(uv, zi);
 		else{
 			float lerpz = zz - zi;
-			XMStoreFloat4(&ret, DirectX::XMVectorLerp(
+			return  DirectX::XMVectorLerp(
 				MipMapBilinearSampler(uv, zi),
-				MipMapBilinearSampler(uv, zi + 1), lerpz));
+				MipMapBilinearSampler(uv, zi + 1), lerpz);
 		}
-		return ret;
 	}
 	BITMAPFILEHEADER bmpHeader;
 	BITMAPINFOHEADER bmpInfHeader;

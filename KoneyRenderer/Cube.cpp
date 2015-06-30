@@ -1,7 +1,7 @@
 #include "App.hpp"
 using namespace std;
 using namespace DirectX;
-const float  length = 3.5f;
+const float  length = 3.0f;
 class CubeApp : public App
 {
 public:
@@ -19,8 +19,8 @@ private:
 	XMMATRIX mProj;
 	XMMATRIX mWVP;
 	Triangle triangle[12];
-	XMFLOAT4 point[8];
-	XMFLOAT4 normal[6];
+	XMVECTOR point[8];
+	XMVECTOR normal[6];
 	float mTheta;
 	float mPhi;
 	float mRotate;
@@ -89,11 +89,10 @@ void CubeApp::updateScene(float dt)
 	float z = -length*sinf(mPhi)*cosf(mTheta);
 	float y = length*cosf(mPhi);
 	// Build the view matrix.
-	XMVECTOR pos = { x, y, z, 1.0f };
+	renderer.eyePos = { { x, y, z, 1.0f } };
 	XMVECTOR target = { 0.0f, 0.0f, 0.0f, 1.0f };
 	XMVECTOR up = { 0.0f, 1.0f, 0.0f, 1.0f };
-	mView = XMMatrixLookAtLH(pos, target, up);
-	XMStoreFloat3(&renderer.eyePos, pos);
+	mView = XMMatrixLookAtLH(renderer.eyePos, target, up);
 #ifdef ROTATE
 	renderer.mw = XMMatrixRotationAxis({ { 0.0f, 1.0f, 0.0f, 1.0f } }, dt * 1.0f);
 	renderer.mvp = renderer.mw * mView*mProj;
@@ -113,73 +112,73 @@ void CubeApp::drawScene()
 }
 
 void CubeApp::initVertex(){
-	point[0] = { -1.0f, 1.0f, -1.0f, 1.0f };//-z
-	point[1] = {  1.0f, 1.0f, -1.0f, 1.0f };
-	point[2] = { -1.0f,-1.0f, -1.0f, 1.0f };
-	point[3] = {  1.0f,-1.0f, -1.0f, 1.0f };
-	point[4] = { -1.0f, 1.0f, 1.0f, 1.0f  };//z
-	point[5] = {  1.0f, 1.0f, 1.0f, 1.0f  };
-	point[6] = { -1.0f,-1.0f, 1.0f, 1.0f  };
-	point[7] = {  1.0f,-1.0f, 1.0f, 1.0f  };
+	point[0] = { {-1.0f, 1.0f, -1.0f, 1.0f }};//-z
+	point[1] = { { 1.0f, 1.0f, -1.0f, 1.0f }};
+	point[2] = { {-1.0f,-1.0f, -1.0f, 1.0f }};
+	point[3] = { { 1.0f,-1.0f, -1.0f, 1.0f }};
+	point[4] = { {-1.0f, 1.0f, 1.0f, 1.0f  }};//z
+	point[5] = { { 1.0f, 1.0f, 1.0f, 1.0f  }};
+	point[6] = { {-1.0f,-1.0f, 1.0f, 1.0f  }};
+	point[7] = { { 1.0f,-1.0f, 1.0f, 1.0f  }};
 
-	normal[0] = { 0.0f, 0.0f, -1.0f, 0.0f };//-z
-	normal[1] = { 0.0f, 0.0f, 1.0f, 0.0f  };//z
-	normal[2] = { -1.0f, 0.0f, 0.0f, 0.0f };//-x
-	normal[3] = { 1.0f, 0.0f, 0.0f, 0.0f  };//x
-	normal[4] = { 0.0f,-1.0f,  0.0f, 0.0f };//-y
-	normal[5] = { 0.0f, 1.0f,  0.0f, 0.0f };//y
+	normal[0] = { {0.0f, 0.0f, -1.0f, 0.0f }};//-z
+	normal[1] = { {0.0f, 0.0f, 1.0f, 0.0f  }};//z
+	normal[2] = { {-1.0f, 0.0f, 0.0f, 0.0f }};//-x
+	normal[3] = { {1.0f, 0.0f, 0.0f, 0.0f  }};//x
+	normal[4] = { {0.0f,-1.0f,  0.0f, 0.0f }};//-y
+	normal[5] = { {0.0f, 1.0f,  0.0f, 0.0f }};//y
 	
 }
 
 void CubeApp::initTriangle()
 {
-	triangle[0].vert[0] = { point[0], {}, normal[0], { 0.0f, 0.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
-	triangle[0].vert[1] = { point[1], {}, normal[0], { 1.0f, 0.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
-	triangle[0].vert[2] = { point[2], {}, normal[0], { 0.0f, 1.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
+	triangle[0].vert[0] = { point[0], {}, normal[0], {{ 0.0f, 0.0f }}, {}, {{ 1.0f, 0.0f, 0.0f, 0.0f }} };
+	triangle[0].vert[1] = { point[1], {}, normal[0], {{ 1.0f, 0.0f }}, {}, {{ 1.0f, 0.0f, 0.0f, 0.0f }} };
+	triangle[0].vert[2] = { point[2], {}, normal[0], {{ 0.0f, 1.0f }}, {}, {{ 1.0f, 0.0f, 0.0f, 0.0f }} };
 
-	triangle[1].vert[0] = { point[2], {}, normal[0], { 0.0f, 1.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
-	triangle[1].vert[1] = { point[1], {}, normal[0], { 1.0f, 0.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
-	triangle[1].vert[2] = { point[3], {}, normal[0], { 1.0f, 1.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
+	triangle[1].vert[0] = { point[2], {}, normal[0], {{ 0.0f, 1.0f }}, {}, {{ 1.0f, 0.0f, 0.0f, 0.0f }} };
+	triangle[1].vert[1] = { point[1], {}, normal[0], {{ 1.0f, 0.0f }}, {}, {{ 1.0f, 0.0f, 0.0f, 0.0f }} };
+	triangle[1].vert[2] = { point[3], {}, normal[0], {{ 1.0f, 1.0f }}, {}, {{ 1.0f, 0.0f, 0.0f, 0.0f }} };
 
-	triangle[2].vert[0] = { point[1], {}, normal[3], { 0.0f, 0.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
-	triangle[2].vert[1] = { point[5], {}, normal[3], { 1.0f, 0.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
-	triangle[2].vert[2] = { point[3], {}, normal[3], { 0.0f, 1.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
+	triangle[2].vert[0] = { point[1], {}, normal[3], {{ 0.0f, 0.0f }}, {}, {{ 1.0f, 0.0f, 0.0f, 0.0f }} };
+	triangle[2].vert[1] = { point[5], {}, normal[3], {{ 1.0f, 0.0f }}, {}, {{ 1.0f, 0.0f, 0.0f, 0.0f }} };
+	triangle[2].vert[2] = { point[3], {}, normal[3], {{ 0.0f, 1.0f }}, {}, {{ 1.0f, 0.0f, 0.0f, 0.0f }} };
 
-	triangle[3].vert[0] = { point[3], {}, normal[3], { 0.0f, 1.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
-	triangle[3].vert[1] = { point[5], {}, normal[3], { 1.0f, 0.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
-	triangle[3].vert[2] = { point[7], {}, normal[3], { 1.0f, 1.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
+	triangle[3].vert[0] = { point[3], {}, normal[3], {{ 0.0f, 1.0f }}, {}, {{ 1.0f, 0.0f, 0.0f, 0.0f }} };
+	triangle[3].vert[1] = { point[5], {}, normal[3], {{ 1.0f, 0.0f }}, {}, {{ 1.0f, 0.0f, 0.0f, 0.0f }} };
+	triangle[3].vert[2] = { point[7], {}, normal[3], {{ 1.0f, 1.0f }}, {}, {{ 1.0f, 0.0f, 0.0f, 0.0f }} };
 
-	triangle[4].vert[0] = { point[5], {}, normal[1], { 0.0f, 0.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
-	triangle[4].vert[1] = { point[4], {}, normal[1], { 1.0f, 0.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
-	triangle[4].vert[2] = { point[7], {}, normal[1], { 0.0f, 1.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
+	triangle[4].vert[0] = { point[5], {}, normal[1], {{ 0.0f, 0.0f }}, {}, {{ 1.0f, 0.0f, 0.0f, 0.0f }} };
+	triangle[4].vert[1] = { point[4], {}, normal[1], {{ 1.0f, 0.0f }}, {}, {{ 1.0f, 0.0f, 0.0f, 0.0f }} };
+	triangle[4].vert[2] = { point[7], {}, normal[1], {{ 0.0f, 1.0f }}, {}, {{ 1.0f, 0.0f, 0.0f, 0.0f }} };
 
-	triangle[5].vert[0] = { point[7], {}, normal[1], { 0.0f, 1.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
-	triangle[5].vert[1] = { point[4], {}, normal[1], { 1.0f, 0.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
-	triangle[5].vert[2] = { point[6], {}, normal[1], { 1.0f, 1.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
+	triangle[5].vert[0] = { point[7], {}, normal[1], {{ 0.0f, 1.0f }}, {}, {{ 1.0f, 0.0f, 0.0f, 0.0f }} };
+	triangle[5].vert[1] = { point[4], {}, normal[1], {{ 1.0f, 0.0f }}, {}, {{ 1.0f, 0.0f, 0.0f, 0.0f }} };
+	triangle[5].vert[2] = { point[6], {}, normal[1], {{ 1.0f, 1.0f }}, {}, {{ 1.0f, 0.0f, 0.0f, 0.0f }} };
 
-	triangle[6].vert[0] = { point[4], {}, normal[2], { 0.0f, 0.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
-	triangle[6].vert[1] = { point[0], {}, normal[2], { 1.0f, 0.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
-	triangle[6].vert[2] = { point[6], {}, normal[2], { 0.0f, 1.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
+	triangle[6].vert[0] = { point[4], {}, normal[2], {{ 0.0f, 0.0f }}, {}, {{ 1.0f, 0.0f, 0.0f, 0.0f }} };
+	triangle[6].vert[1] = { point[0], {}, normal[2], {{ 1.0f, 0.0f }}, {}, {{ 1.0f, 0.0f, 0.0f, 0.0f }} };
+	triangle[6].vert[2] = { point[6], {}, normal[2], {{ 0.0f, 1.0f }}, {}, {{ 1.0f, 0.0f, 0.0f, 0.0f }} };
 
-	triangle[7].vert[0] = { point[6], {}, normal[2], { 0.0f, 1.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
-	triangle[7].vert[1] = { point[0], {}, normal[2], { 1.0f, 0.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
-	triangle[7].vert[2] = { point[2], {}, normal[2], { 1.0f, 1.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
+	triangle[7].vert[0] = { point[6], {}, normal[2], {{ 0.0f, 1.0f }}, {}, {{ 1.0f, 0.0f, 0.0f, 0.0f }} };
+	triangle[7].vert[1] = { point[0], {}, normal[2], {{ 1.0f, 0.0f }}, {}, {{ 1.0f, 0.0f, 0.0f, 0.0f }} };
+	triangle[7].vert[2] = { point[2], {}, normal[2], {{ 1.0f, 1.0f }}, {}, {{ 1.0f, 0.0f, 0.0f, 0.0f }} };
 
-	triangle[8].vert[0] = { point[3], {}, normal[4], { 0.0f, 0.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
-	triangle[8].vert[1] = { point[7], {}, normal[4], { 1.0f, 0.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
-	triangle[8].vert[2] = { point[2], {}, normal[4], { 0.0f, 1.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
+	triangle[8].vert[0] = { point[3], {}, normal[4], {{ 0.0f, 0.0f }}, {}, {{ 1.0f, 0.0f, 0.0f, 0.0f }} };
+	triangle[8].vert[1] = { point[7], {}, normal[4], {{ 1.0f, 0.0f }}, {}, {{ 1.0f, 0.0f, 0.0f, 0.0f }} };
+	triangle[8].vert[2] = { point[2], {}, normal[4], {{ 0.0f, 1.0f }}, {}, {{ 1.0f, 0.0f, 0.0f, 0.0f }} };
 
-	triangle[9].vert[0] = { point[2], {}, normal[4], { 0.0f, 1.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
-	triangle[9].vert[1] = { point[7], {}, normal[4], { 1.0f, 0.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
-	triangle[9].vert[2] = { point[6], {}, normal[4], { 1.0f, 1.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
+	triangle[9].vert[0] = { point[2], {}, normal[4], {{ 0.0f, 1.0f }}, {}, {{ 1.0f, 0.0f, 0.0f, 0.0f }} };
+	triangle[9].vert[1] = { point[7], {}, normal[4], {{ 1.0f, 0.0f }}, {}, {{ 1.0f, 0.0f, 0.0f, 0.0f }} };
+	triangle[9].vert[2] = { point[6], {}, normal[4], {{ 1.0f, 1.0f }}, {}, {{ 1.0f, 0.0f, 0.0f, 0.0f }} };
 
-	triangle[10].vert[0] = { point[0], {}, normal[5], { 0.0f, 0.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
-	triangle[10].vert[1] = { point[4], {}, normal[5], { 1.0f, 0.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
-	triangle[10].vert[2] = { point[1], {}, normal[5], { 0.0f, 1.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
+	triangle[10].vert[0] = { point[0], {}, normal[5], {{ 0.0f, 0.0f }}, {}, {{ 1.0f, 0.0f, 0.0f, 0.0f }} };
+	triangle[10].vert[1] = { point[4], {}, normal[5], {{ 1.0f, 0.0f }}, {}, {{ 1.0f, 0.0f, 0.0f, 0.0f }} };
+	triangle[10].vert[2] = { point[1], {}, normal[5], {{ 0.0f, 1.0f }}, {}, {{ 1.0f, 0.0f, 0.0f, 0.0f }} };
 
-	triangle[11].vert[0] = { point[1], {}, normal[5], { 0.0f, 1.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
-	triangle[11].vert[1] = { point[4], {}, normal[5], { 1.0f, 0.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
-	triangle[11].vert[2] = { point[5], {}, normal[5], { 1.0f, 1.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
+	triangle[11].vert[0] = { point[1], {}, normal[5], {{ 0.0f, 1.0f }}, {}, {{ 1.0f, 0.0f, 0.0f, 0.0f }} };
+	triangle[11].vert[1] = { point[4], {}, normal[5], {{ 1.0f, 0.0f }}, {}, {{ 1.0f, 0.0f, 0.0f, 0.0f }} };
+	triangle[11].vert[2] = { point[5], {}, normal[5], {{ 1.0f, 1.0f }}, {}, {{ 1.0f, 0.0f, 0.0f, 0.0f }} };
 
 }
 
