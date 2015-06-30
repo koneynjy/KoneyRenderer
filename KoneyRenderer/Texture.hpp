@@ -16,10 +16,9 @@ public:
 
 	__forceinline DirectX::XMFLOAT4 BilinearSampler(DirectX::XMFLOAT2& uv){
 		float wf = w * uv.x, hf = h * uv.y;
-		float lerpx = wf - floorf(wf), lerpy = hf - floorf(hf);
-		//if (wi == w || hi == h) return *((DirectX::XMFLOAT4*)(bmpData)+biwidth * hi + wi);
-		//if (lerpx < EPS || lerpy < EPS) return *((DirectX::XMFLOAT4*)(bmpData)+biwidth * hi + wi);
-		DirectX::XMFLOAT4* pd = (DirectX::XMFLOAT4*)(bmpData) + biwidth * (int)hf + (int)wf, *pu = pd + biwidth;
+		int wi = wf, hi = hf;
+		float lerpx = wf - wi, lerpy = hf - hi;
+		DirectX::XMFLOAT4* pd = (DirectX::XMFLOAT4*)(bmpData) + biwidth * hi + wi, *pu = pd + biwidth;
 		DirectX::XMFLOAT4 ret;
 		XMStoreFloat4(&ret, DirectX::XMVectorLerp(
 			DirectX::XMVectorLerp(XMLoadFloat4(pd), XMLoadFloat4(pd + 1), lerpx),
@@ -41,10 +40,9 @@ public:
 
 	__forceinline DirectX::XMVECTOR MipMapBilinearSampler(DirectX::XMFLOAT2& uv, int z){
 		float wf = mipW[z] * uv.x, hf = mipH[z] * uv.y;
-		float lerpx = wf - floorf(wf), lerpy = hf - floorf(hf);
-		//if (wi == w || hi == h) return *((DirectX::XMFLOAT4*)(bmpData)+biwidth * hi + wi);
-		//if (lerpx < EPS || lerpy < EPS) return *((DirectX::XMFLOAT4*)(bmpData)+biwidth * hi + wi);
-		DirectX::XMFLOAT4* pd = (DirectX::XMFLOAT4*)(mipmap[z]) + mipBiWidth[z] * (int)hf + (int)wf, *pu = pd + mipBiWidth[z];
+		int wi = wf, hi = hf;
+		float lerpx = wf - wi, lerpy = hf - hi;
+		DirectX::XMFLOAT4* pd = (DirectX::XMFLOAT4*)(mipmap[z]) + mipBiWidth[z] * hi + wi, *pu = pd + mipBiWidth[z];
 		DirectX::XMFLOAT4 ret;
 		return DirectX::XMVectorLerp(
 			DirectX::XMVectorLerp(XMLoadFloat4(pd), XMLoadFloat4(pd + 1), lerpx),

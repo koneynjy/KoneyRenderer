@@ -28,20 +28,18 @@ inline float quickPow(float a, int b){
 const int nSize = 200;
 const int lutSize = 0x10000;
 const float lutsf = lutSize - 1;
-float pLUT[lutSize + 1][nSize];
+float pLUT[lutSize + 1];
 
-void initLUT(){
+void initLUT(int n){
 	float dy = 1.0f / lutSize, dx = 0.0f;
 	for (int i = 0; i <= lutSize; i++){
-		pLUT[i][0] = 1.0f;
-		for (int j = 1; j < nSize; j++)
-			pLUT[i][j] = pLUT[i][j - 1] * dx;
+		pLUT[i] = quickPow(dx, n);
 		dx += dy;
 	}
 }
 
 inline float lutPow(float a, int b){
-	return pLUT[int(a * lutsf)][b];
+	return pLUT[int(a * lutsf)];
 }
 
 // inline void genCoe(float tmp,

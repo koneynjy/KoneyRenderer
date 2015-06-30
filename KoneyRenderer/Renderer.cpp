@@ -15,7 +15,7 @@ void Renderer::setSize(int width, int height){
 	wCor = wScale - 0.5f, hCor = hScale - 0.5f;
 	texture.Load("Texture\\wood.bmp");
 	//t = new std::thread[bSize];
-	initLUT();
+	initLUT(n);
 }
 
 Renderer::~Renderer()
@@ -137,13 +137,6 @@ void Renderer::Render(){
 #endif
 		
 	}
-// 	for (int i = 0; i < bSize; i++){
-// 		t[i] = std::thread(&Renderer::RasterizeAndOutputIndexed, this, i);
-// 	}
-// 
-// 	for (int i = 0; i < bSize; i++){
-// 		t[i].join();
-// 	}
 }
 
 void Renderer::RasterizeAndOutputIndexed(int i){

@@ -36,6 +36,7 @@ public:
 	DirectX::XMFLOAT3 eyePos;
 	DirectX::XMFLOAT3 spec = {1.0f,1.0f,1.0f};
 	int n = 60;
+	float nf = 60.0f;
 	Texture texture;
 	int bSize,padding;
 	int fbWidth, fbHeight;
@@ -46,6 +47,5 @@ public:
 	unsigned *fbdata;
 	unsigned short *zbuffer;
 	unsigned int count;
-	std::thread *t;
 };
 #endif

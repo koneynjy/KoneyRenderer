@@ -12,7 +12,7 @@
 #define PIXELLIGHT
 #define SPECULAR
 #define TEXTURE
-//#define BILINEAR
+#define BILINEAR
 #define YCULL
 #define XCULL
 //#define TRILINEAR

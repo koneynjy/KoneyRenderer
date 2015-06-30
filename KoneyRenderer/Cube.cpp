@@ -1,7 +1,7 @@
 #include "App.hpp"
 using namespace std;
 using namespace DirectX;
-const float  length = 3.5f;
+const float  length = 3.0f;
 class CubeApp : public App
 {
 public:
@@ -134,12 +134,12 @@ void CubeApp::initVertex(){
 void CubeApp::initTriangle()
 {
 	triangle[0].vert[0] = { point[0], {}, normal[0], { 0.0f, 0.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
-	triangle[0].vert[1] = { point[1], {}, normal[0], { 1.0f, 0.0f }, {}, { 0.0f, 1.0f, 0.0f, 0.0f } };
-	triangle[0].vert[2] = { point[2], {}, normal[0], { 0.0f, 1.0f }, {}, { 0.0f, 0.0f, 1.0f, 0.0f } };
+	triangle[0].vert[1] = { point[1], {}, normal[0], { 1.0f, 0.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
+	triangle[0].vert[2] = { point[2], {}, normal[0], { 0.0f, 1.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
 
 	triangle[1].vert[0] = { point[2], {}, normal[0], { 0.0f, 1.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
-	triangle[1].vert[1] = { point[1], {}, normal[0], { 1.0f, 0.0f }, {}, { 0.0f, 1.0f, 0.0f, 0.0f } };
-	triangle[1].vert[2] = { point[3], {}, normal[0], { 1.0f, 1.0f }, {}, { 0.0f, 0.0f, 1.0f, 0.0f } };
+	triangle[1].vert[1] = { point[1], {}, normal[0], { 1.0f, 0.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
+	triangle[1].vert[2] = { point[3], {}, normal[0], { 1.0f, 1.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
 
 	triangle[2].vert[0] = { point[1], {}, normal[3], { 0.0f, 0.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
 	triangle[2].vert[1] = { point[5], {}, normal[3], { 1.0f, 0.0f }, {}, { 1.0f, 0.0f, 0.0f, 0.0f } };
