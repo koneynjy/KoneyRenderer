@@ -4,14 +4,18 @@
 #include <assert.h>
 using namespace DirectX;
 
-Renderer::Renderer():fbdata(NULL),zbuffer(NULL){
+Renderer::Renderer() :fbdata(NULL), zbuffer(NULL){
 	light = { { -0.57735f, 0.57735f, 0.57735f } };
 	lightPoint = { { 2.0f, 2.0f, 2.0f } };
 	lightColor = { { 1.0f, 1.0f, 1.0f } };
-	aColor = { { 0.2f, 0.2f, 0.2f } };
+	aColor = { { 0.05f, 0.05f, 0.05f } };
 	eyePos;
 	spec = { { 1.0f, 1.0f, 1.0f } };
 	colorOverRide = { { 0.5f, 0.5f, 0.5f, 0.0f } };
+#ifdef GAMMACORRECT
+	colorOverRide = XMVectorPow(colorOverRide, { {2.2f,2.2f,2.2f,2.2f} });
+#endif
+	gammaCorrect = { {0.45f,0.45f,0.45f,0.45f} };
 }
 void Renderer::setSize(int width, int height){
 	fbWidth = width, fbHeight = height;
@@ -60,10 +64,19 @@ __forceinline XMVECTOR Renderer::lightShader(Vertex& vert){
 	if (sp > EPS){
 		XMVECTOR specular = XMVectorScale(spec, lutPow(sp, n));
 		specular = XMVectorMultiply(lightc, specular);
+#ifdef GAMMACORRECT
+		//XMVectorSqrt
+		return GammaCorrect(XMVectorSaturate(XMVectorAdd(specular, XMVectorMultiply(diffuse, color))));
+#else
 		return XMVectorSaturate(XMVectorAdd(specular, XMVectorMultiply(diffuse, color)));
+#endif	
 	}
 	else{
+#ifdef GAMMACORRECT
+		return GammaCorrect(XMVectorSaturate(XMVectorMultiply(diffuse, color)));
+#else
 		return XMVectorSaturate(XMVectorMultiply(diffuse, color));
+#endif
 	}
 	
 #else
@@ -137,13 +150,48 @@ void Renderer::Render(){
 		VertexShader(triangleBuffer[i].vert[0]);
 		VertexShader(triangleBuffer[i].vert[1]);
 		VertexShader(triangleBuffer[i].vert[2]);
+#ifdef CLIPNEAR
+		ClippNearRasterization(triangleBuffer[i]);
+#else
 #ifdef MULTITHREAD
 		RasterizeMultiThread(triangleBuffer[i]);
 #else
 		RasterizeAndOutput(triangleBuffer[i]);
 #endif
-		
+#endif
 	}
+}
+
+void Renderer::ClippNearRasterization(Triangle& triangle){
+	XMVECTOR p[3];
+	p[0] = triangle.vert[0].positionH;
+	p[1] = triangle.vert[1].positionH;
+	p[2] = triangle.vert[2].positionH;
+	bool inout[3];
+	inout[0] = p[0].m128_f32[2] > EPS;
+	inout[1] = p[1].m128_f32[2] > EPS;
+	inout[2] = p[2].m128_f32[2] > EPS;
+	Vertex vertex[4];
+	int vcnt = 0;
+	if (inout[0]) vertex[vcnt++] = triangle.vert[0];
+
+	if (inout[0] ^ inout[1]){
+		float t = p[0].m128_f32[2] / (p[0].m128_f32[0] - p[0].m128_f32[2]);
+	}
+
+	if (inout[1]) vertex[vcnt++] = triangle.vert[1];
+
+	if (inout[1] ^ inout[2]){
+
+	}
+
+	if (inout[2]) vertex[vcnt++] = triangle.vert[2];
+
+	if (inout[2] ^ inout[0]){
+
+	}
+
+
 }
 
 void Renderer::RasterizeAndOutputIndexed(int i){
@@ -159,7 +207,7 @@ void Renderer::RasterizeAndOutput(Triangle & triangle){
 	p0 = XMVectorScale(p0, zz.m128_f32[0]);
 	p1 = XMVectorScale(p1, zz.m128_f32[1]);
 	p2 = XMVectorScale(p2, zz.m128_f32[2]);
-	XMVECTOR zvec = { p0.m128_f32[2] * 65535, p0.m128_f32[2] * 65535, p2.m128_f32[2] * 65535 };
+	
 #ifdef CULL_BACK
 	XMVECTOR v0 = XMVectorSubtract(p1, p0);
 	XMVECTOR v1 = XMVectorSubtract(p2, p1);
@@ -174,6 +222,7 @@ void Renderer::RasterizeAndOutput(Triangle & triangle){
 	if (cross.m128_f32[2] <= 0) return;
 #endif // CULL_BACK
 
+	XMVECTOR zvec = { p0.m128_f32[2] * 65535, p0.m128_f32[2] * 65535, p2.m128_f32[2] * 65535 };
 	XMVECTOR X = { p0.m128_f32[0], p1.m128_f32[0], p2.m128_f32[0] };
 	XMVECTOR Y = { p0.m128_f32[1], p1.m128_f32[1], p2.m128_f32[1] };
 	XMVECTOR wsVec = { wScale, wScale, wScale };
@@ -221,7 +270,7 @@ void Renderer::RasterizeAndOutput(Triangle & triangle){
 	};
 	XMVECTOR abcx = abcybase;
 	float zybase = XMVector3Dot(abcybase, zvec).m128_f32[0], zx = zybase;
-	float zdx = XMVector3Dot(abcybase, a).m128_f32[0], zdy = XMVector3Dot(abcybase, b).m128_f32[0];
+	float zdx = XMVector3Dot(zvec, a).m128_f32[0], zdy = XMVector3Dot(zvec, b).m128_f32[0];
 	XMMATRIX pos, normal, uv, rgb;
 	pos.r[0] = triangle.vert[0].position;
 	pos.r[1] = triangle.vert[1].position;
@@ -334,22 +383,24 @@ void Renderer::RasterizeAndOutput(Triangle & triangle){
 #endif
 			for (int j = start; j < end; j++){
 				float scale = 1.0f / zabcX, paddingf[3];
-				tvert.uv = XMVectorScale(uvX, scale);
-				tvert.color = XMVectorScale(colorX, scale);
+				//if (zx > -EPS && zx < 65535.0f){
+					tvert.uv = XMVectorScale(uvX, scale);
+					tvert.color = XMVectorScale(colorX, scale);
 #ifdef DEBUG_MODE
-				if (j == start) tvert.color = { 1.0f, 0.0f, 0.0f, 0.0f };
-				else if (j == end - 1) tvert.color = { 0.0f, 0.0f, 0.0f, 0.0f };
-				else if (cnt == 3) tvert.color = { 0.0f, 1.0f, 0.0f,0.0f };
-				else tvert.color = { 0.0f, 0.0f, 1.0f, 0.0f };
+					if (j == start) tvert.color = { 1.0f, 0.0f, 0.0f, 0.0f };
+					else if (j == end - 1) tvert.color = { 0.0f, 0.0f, 0.0f, 0.0f };
+					else if (cnt == 3) tvert.color = { 0.0f, 1.0f, 0.0f,0.0f };
+					else tvert.color = { 0.0f, 0.0f, 1.0f, 0.0f };
 #endif
 #ifdef PIXELLIGHT
-				tvert.position = XMVectorScale(posX, scale);
-				tvert.normal = XMVectorScale(normalX, scale);
+					tvert.position = XMVectorScale(posX, scale);
+					tvert.normal = XMVectorScale(normalX, scale);
 #endif
-				//zx = XMVector3Dot(abcx, zvec).m128_f32[0];
-				OutputMerge(PixelShader(tvert, scale), zx, j, i);
-				//OutputMerge(texture.BilinearSampler(tvert.uv), zx, j, i);
-				////////////////////////////////////////////////////////////////////
+					//zx = XMVector3Dot(abcx, zvec).m128_f32[0];
+					OutputMerge(PixelShader(tvert, scale), zx, j, i);
+					//OutputMerge(texture.BilinearSampler(tvert.uv), zx, j, i);
+					////////////////////////////////////////////////////////////////////
+				//}
 				zabcX += zaScale;
 				zx += zdx;
 				abcx = XMVectorAdd(abcx, a);
@@ -538,20 +589,22 @@ void Renderer::RasterizeLine(int sy, int ey){
 #endif
 			for (int j = start; j < end; j++){
 				float scale = 1.0f / zabcX, paddingf[3];
-				tvert.uv= XMVectorScale(uvX, scale);
-				tvert.color= XMVectorScale(colorX, scale);
+				//if (scale > -EPS){
+					tvert.uv = XMVectorScale(uvX, scale);
+					tvert.color = XMVectorScale(colorX, scale);
 #ifdef DEBUG_MODE
-				if (j == start) tvert.color = { 1.0f, 0.0f, 0.0f, 0.0f };
-				else if (j == end - 1) tvert.color = { 0.0f, 0.0f, 0.0f, 0.0f };
-				else if (cnt == 3) tvert.color = { 0.0f, 1.0f, 0.0f, 0.0f };
-				else tvert.color = { 0.0f, 0.0f, 1.0f, 0.0f };
+					if (j == start) tvert.color = { 1.0f, 0.0f, 0.0f, 0.0f };
+					else if (j == end - 1) tvert.color = { 0.0f, 0.0f, 0.0f, 0.0f };
+					else if (cnt == 3) tvert.color = { 0.0f, 1.0f, 0.0f, 0.0f };
+					else tvert.color = { 0.0f, 0.0f, 1.0f, 0.0f };
 #endif
 #ifdef PIXELLIGHT
-				tvert.position= XMVectorScale(posX, scale);
-				tvert.normal= XMVectorScale(normalX, scale);
+					tvert.position = XMVectorScale(posX, scale);
+					tvert.normal = XMVectorScale(normalX, scale);
 #endif
-				//zx = XMVector3Dot(abcx, zvec).m128_f32[0];
-				OutputMerge(PixelShader(tvert, scale), zx, j, i);
+					//zx = XMVector3Dot(abcx, zvec).m128_f32[0];
+					OutputMerge(PixelShader(tvert, scale), zx, j, i);
+				//}
 				//OutputMerge(texture.BilinearSampler(tvert.uv), zx, j, i);
 				////////////////////////////////////////////////////////////////////
 				zabcX += zaScale;
@@ -670,7 +723,7 @@ void Renderer::RasterizeMultiThread(Triangle&triangle){
 		0
 	}};
 	zybase =		XMVector3Dot(abcybase, zvec).m128_f32[0];
-	zdx =			XMVector3Dot(abcybase, a).m128_f32[0], zdy = XMVector3Dot(abcybase, b).m128_f32[0];
+	zdx =			XMVector3Dot(zvec, a).m128_f32[0], zdy = XMVector3Dot(zvec, b).m128_f32[0];
 	abczBasey =		XMVectorMultiply(abcybase, zz);
 	za =			XMVectorMultiply(a, zz), zb = XMVectorMultiply(b, zz);
 	colorBasey =	XMVector4Transform(abczBasey, rgb);

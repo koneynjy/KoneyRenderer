@@ -1,7 +1,6 @@
 #include "App.hpp"
 using namespace std;
 using namespace DirectX;
-const float  length = 3.0f;
 class CubeApp : public App
 {
 public:
@@ -24,6 +23,7 @@ private:
 	float mTheta;
 	float mPhi;
 	float mRotate;
+	float mlength = 0.5f;
 };
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance,
@@ -43,7 +43,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance,
 }
 
 CubeApp::CubeApp(HINSTANCE hInstance)
-	: App(hInstance), mTheta(0.0f), mPhi(PI*0.25f), mRotate(0.0f){
+	: App(hInstance), mTheta(0.0f), mPhi(PI * 0.25f), mRotate(0.0f), mlength(5.0f){
 	mView = XMMatrixIdentity();
 	mProj = XMMatrixIdentity();
 	mWVP = XMMatrixIdentity();
@@ -68,26 +68,32 @@ void CubeApp::onResize()
 	float aspect = (float)mClientWidth / mClientHeight;
 	mProj = XMMatrixPerspectiveFovLH(0.25f*PI, aspect, 1.0f, 1000.0f);
 }
+char chInput[512];
 
 void CubeApp::updateScene(float dt)
 {
 	App::updateScene(dt);
-
+	
 	// Update angles based on input to orbit camera around box.
 	if (GetAsyncKeyState('A') & 0x8000)	mTheta -= 1.0f*dt;
 	if (GetAsyncKeyState('D') & 0x8000)	mTheta += 1.0f*dt;
 	if (GetAsyncKeyState('W') & 0x8000)	mPhi -= 1.0f*dt;
 	if (GetAsyncKeyState('S') & 0x8000)	mPhi += 1.0f*dt;
-
+	if (GetAsyncKeyState('Z') & 0x8000) mlength -= 1.0f*dt;
+	if (GetAsyncKeyState('X') & 0x8000) mlength += 1.0f*dt;
+	//sprintf(chInput, "length:%f theta:%f phi:%f\n", mlength, mTheta, mPhi);
+	//OutputDebugStringA(chInput);
+ 	
+	if (mlength < 0.1f) mlength = 0.1f;
 	// Restrict the angle mPhi.
-	if (mPhi < 0.1f)	mPhi = 0.1f;
-	if (mPhi > PI - 0.1f)	mPhi = PI - 0.1f;
+	if (mPhi < 0.0001f)	mPhi = 0.0001f;
+	if (mPhi > PI - 0.00001f)	mPhi = PI - 0.00001f;
 
 	// Convert Spherical to Cartesian coordinates: mPhi measured from +y
 	// and mTheta measured counterclockwise from -z.
-	float x = length*sinf(mPhi)*sinf(mTheta);
-	float z = -length*sinf(mPhi)*cosf(mTheta);
-	float y = length*cosf(mPhi);
+	float x = mlength*sinf(mPhi)*sinf(mTheta);
+	float z = -mlength*sinf(mPhi)*cosf(mTheta);
+	float y = mlength*cosf(mPhi);
 	// Build the view matrix.
 	renderer.eyePos = { { x, y, z, 1.0f } };
 	XMVECTOR target = { 0.0f, 0.0f, 0.0f, 1.0f };

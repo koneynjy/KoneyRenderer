@@ -1,6 +1,7 @@
 #ifndef _UTIL
 #define _UTIL
 
+#include "DirectXMath.h"
 #define INTRIANGLE(x)				\
 	(x.m128_f32[0] >= -IMGEPS &&		\
 	 x.m128_f32[1] >= -IMGEPS &&		\
@@ -32,6 +33,7 @@ const int nSize = 200;
 const int lutSize = 0x10000;
 const float lutsf = lutSize - 1;
 float pLUT[lutSize + 1];
+float gLUT[lutSize + 1];
 
 void initLUT(int n){
 	float dy = 1.0f / lutSize, dx = 0.0f;
@@ -39,10 +41,23 @@ void initLUT(int n){
 		pLUT[i] = quickPow(dx, n);
 		dx += dy;
 	}
+	dy = 1.0f / lutSize, dx = 0.0f;
+	for (int i = 0; i <= lutSize; i++){
+		gLUT[i] = powf(dx, 0.45f);
+		dx += dy;
+	}
 }
 
 __forceinline float lutPow(float a, int b){
 	return pLUT[int(a * lutsf)];
+}
+
+__forceinline DirectX::XMVECTOR GammaCorrect(DirectX::XMVECTOR &v){
+	DirectX::XMVECTOR t = DirectX::XMVectorScale(v, lutsf);
+	v.m128_f32[0] = gLUT[int(t.m128_f32[0])];
+	v.m128_f32[1] = gLUT[int(t.m128_f32[1])];
+	v.m128_f32[2] = gLUT[int(t.m128_f32[2])];
+	return v;
 }
 
 // inline void genCoe(float tmp,

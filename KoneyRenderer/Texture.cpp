@@ -1,7 +1,11 @@
 #include "Texture.hpp"
 #include "malloc.h"
+#include "Config.hpp"
+
 using namespace std;
 using namespace DirectX;
+
+extern float quickPow(float f, int i);
 
 Texture::Texture() :bmpData(NULL),mipSize(0){};
 Texture::Texture(string path){
@@ -46,9 +50,16 @@ void Texture::Load(string path){
 	for (int i = 0; i < height; i++){
 		int id1 = d1, id2 = d2;
 		for (int j = 0; j < width; j++){
+#ifdef  GAMMACORRECT
+			bmpData[id2    ] = powf(data[id1 + 2] / 255.0f, 2.2f);
+			bmpData[id2 + 1] = powf(data[id1 + 1] / 255.0f, 2.2f);
+			bmpData[id2 + 2] = powf(data[id1] / 255.0f, 2.2f);
+#else
 			bmpData[id2    ] = data[id1 + 2] / 255.0f;
 			bmpData[id2 + 1] = data[id1 + 1] / 255.0f;
 			bmpData[id2 + 2] = data[id1    ] / 255.0f;
+#endif
+			
 			bmpData[id2 + 3] = 0.0f;
 			id1 += 3, id2 += 4;
 		}

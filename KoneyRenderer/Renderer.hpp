@@ -21,6 +21,7 @@ public:
 	void RasterizeMultiThread(Triangle& triangle);
 	void RasterizeMultiThreadIndexed(int i);
 	void setSize(int width, int height);
+	void ClippNearRasterization(Triangle& triangle);
 	DirectX::XMVECTOR lightShader(Vertex& vert);
 	inline bool check(int x, int y){
 		int idx = y * fbWidth + x;
@@ -36,6 +37,7 @@ public:
 	DirectX::XMVECTOR eyePos;
 	DirectX::XMVECTOR spec;
 	DirectX::XMVECTOR colorOverRide;
+	DirectX::XMVECTOR gammaCorrect;
 	int n = 60;
 	float nf = 60.0f;
 	Texture texture;
