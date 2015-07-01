@@ -66,7 +66,7 @@ void CubeApp::onResize()
 	App::onResize();
 
 	float aspect = (float)mClientWidth / mClientHeight;
-	mProj = XMMatrixPerspectiveFovLH(0.25f*PI, aspect, 1.0f, 1000.0f);
+	mProj = XMMatrixPerspectiveFovLH(0.25f*PI, aspect, renderer.nearP, renderer.farP);
 }
 char chInput[512];
 

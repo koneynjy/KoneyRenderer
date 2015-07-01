@@ -4,7 +4,7 @@
 #define IMGEPS 1e-4
 #define CLIPNEAR
 #define MULTITHREAD
-#define THREAD_COUNT 8
+#define THREAD_COUNT 12
 #define GAMMACORRECT
 //#define ROTATE
 #define CULL_BACK
@@ -13,7 +13,7 @@
 //#define VERTEXLIGHT
 #define PIXELLIGHT
 #define SPECULAR
-//#define TEXTURE
+#define TEXTURE
 #define BILINEAR
 #define YCULL
 #define XCULL

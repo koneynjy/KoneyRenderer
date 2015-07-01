@@ -12,16 +12,16 @@ public:
 	~Renderer();
 	void SetTriangleBuffer(Triangle * triBuffer, int size);
 	void VertexShader(Vertex & vert);
-	void RasterizeAndOutput(Triangle & triangle);
+	void RasterizeAndOutput(Vertex& v0, Vertex& v1, Vertex& v2);
 	void RasterizeAndOutputIndexed(int i);
 	DirectX::XMVECTOR PixelShader(Vertex& vin,float z );
 	void OutputMerge(DirectX::XMVECTOR c, unsigned short z, int x, int y);
 	void Render();
 	void RasterizeLine(int sy, int ey);
-	void RasterizeMultiThread(Triangle& triangle);
+	void RasterizeMultiThread(Vertex& v0, Vertex& v1, Vertex& v2);
 	void RasterizeMultiThreadIndexed(int i);
 	void setSize(int width, int height);
-	void ClippNearRasterization(Triangle& triangle);
+	void ClippNearRasterization(Vertex& v0, Vertex& v1, Vertex& v2);
 	DirectX::XMVECTOR lightShader(Vertex& vert);
 	inline bool check(int x, int y){
 		int idx = y * fbWidth + x;
@@ -47,6 +47,7 @@ public:
 	int fbWf, fbHf;
 	float wScale, hScale;
 	float wCor, hCor;
+	float nearP, farP;
 	unsigned *fbdata;
 	unsigned short *zbuffer;
 	unsigned int count;

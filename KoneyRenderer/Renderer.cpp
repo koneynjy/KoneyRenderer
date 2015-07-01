@@ -4,6 +4,14 @@
 #include <assert.h>
 using namespace DirectX;
 
+__forceinline void lerpVert(Vertex& v, Vertex & v0, Vertex& v1, float t, float mt){
+	v.positionH = XMVectorAdd(XMVectorScale(v0.positionH, mt), XMVectorScale(v1.positionH, t));
+	v.position = XMVectorAdd(XMVectorScale(v0.position, mt), XMVectorScale(v1.position, t));
+	v.normal = XMVectorAdd(XMVectorScale(v0.normal, mt), XMVectorScale(v1.normal, t));
+	v.pcolor = XMVectorAdd(XMVectorScale(v0.pcolor, mt), XMVectorScale(v1.pcolor, t));
+	v.uv = XMVectorAdd(XMVectorScale(v0.uv, mt), XMVectorScale(v1.uv, t));
+}
+
 Renderer::Renderer() :fbdata(NULL), zbuffer(NULL){
 	light = { { -0.57735f, 0.57735f, 0.57735f } };
 	lightPoint = { { 2.0f, 2.0f, 2.0f } };
@@ -16,6 +24,8 @@ Renderer::Renderer() :fbdata(NULL), zbuffer(NULL){
 	colorOverRide = XMVectorPow(colorOverRide, { {2.2f,2.2f,2.2f,2.2f} });
 #endif
 	gammaCorrect = { {0.45f,0.45f,0.45f,0.45f} };
+
+	nearP = 1.0f, farP = 1000.0f;
 }
 void Renderer::setSize(int width, int height){
 	fbWidth = width, fbHeight = height;
@@ -147,78 +157,86 @@ void Renderer::Render(){
 	memset(zbuffer, 0xff, sizeof(unsigned short) * fbWidth * fbHeight);
 	memset(fbdata, 0xAA, sizeof(unsigned)* fbWidth * fbHeight);
 	for (int i = 0; i < bSize; i++){
-		VertexShader(triangleBuffer[i].vert[0]);
-		VertexShader(triangleBuffer[i].vert[1]);
-		VertexShader(triangleBuffer[i].vert[2]);
+		Triangle &triangle = triangleBuffer[i];
+		VertexShader(triangle.vert[0]);
+		VertexShader(triangle.vert[1]);
+		VertexShader(triangle.vert[2]);
 #ifdef CLIPNEAR
-		ClippNearRasterization(triangleBuffer[i]);
+		ClippNearRasterization(triangle.vert[0], triangle.vert[1], triangle.vert[2]);
 #else
 #ifdef MULTITHREAD
-		RasterizeMultiThread(triangleBuffer[i]);
+		RasterizeMultiThread(triangle.vert[0], triangle.vert[1], triangle.vert[2]);
 #else
-		RasterizeAndOutput(triangleBuffer[i]);
+		RasterizeAndOutput(triangle.vert[0], triangle.vert[1], triangle.vert[2]);
 #endif
 #endif
 	}
 }
-
-void Renderer::ClippNearRasterization(Triangle& triangle){
-	XMVECTOR p[3];
-	p[0] = triangle.vert[0].positionH;
-	p[1] = triangle.vert[1].positionH;
-	p[2] = triangle.vert[2].positionH;
-	bool inout[3];
-	inout[0] = p[0].m128_f32[2] > EPS;
-	inout[1] = p[1].m128_f32[2] > EPS;
-	inout[2] = p[2].m128_f32[2] > EPS;
+///////////////////////////3D clipping only for near plane/////////////////////////////////////
+void Renderer::ClippNearRasterization(Vertex& v0, Vertex& v1, Vertex& v2){
+	bool inout0, inout1, inout2;
+	XMVECTOR p0 = v0.positionH;
+	XMVECTOR p1 = v1.positionH;
+	XMVECTOR p2 = v2.positionH;
+	inout0 = p0.m128_f32[2] > EPS;
+	inout1 = p1.m128_f32[2] > EPS;
+	inout2 = p2.m128_f32[2] > EPS;
 	Vertex vertex[4];
 	int vcnt = 0;
-	if (inout[0]) vertex[vcnt++] = triangle.vert[0];
+	if (inout0) vertex[vcnt++] = v0;
 
-	if (inout[0] ^ inout[1]){
-		float t = p[0].m128_f32[2] / (p[0].m128_f32[0] - p[0].m128_f32[2]);
+	if (inout0 ^ inout1){
+		float t = p0.m128_f32[2] / (p0.m128_f32[2] - p1.m128_f32[2]);
+		lerpVert(vertex[vcnt++], v0, v1, t, 1.0f - t);
 	}
 
-	if (inout[1]) vertex[vcnt++] = triangle.vert[1];
+	if (inout1) vertex[vcnt++] = v1;
 
-	if (inout[1] ^ inout[2]){
-
+	if (inout1 ^ inout2){
+		float t = p1.m128_f32[2] / (p1.m128_f32[2] - p2.m128_f32[2]);
+		lerpVert(vertex[vcnt++], v1, v2, t, 1.0f - t);
 	}
 
-	if (inout[2]) vertex[vcnt++] = triangle.vert[2];
+	if (inout2) vertex[vcnt++] = v2;
 
-	if (inout[2] ^ inout[0]){
-
+	if (inout2 ^ inout0){
+		float t = p2.m128_f32[2] / (p2.m128_f32[2] - p0.m128_f32[2]);
+		lerpVert(vertex[vcnt++], v2, v0, t, 1.0f - t);
 	}
-
+	if (!vcnt) return;
+	RasterizeMultiThread(vertex[0], vertex[1], vertex[2]);
+	if (vcnt == 4) RasterizeMultiThread(vertex[0], vertex[2], vertex[3]);
 
 }
 
 void Renderer::RasterizeAndOutputIndexed(int i){
-	RasterizeAndOutput(triangleBuffer[i]);
+	RasterizeAndOutput(
+		triangleBuffer[i].vert[0],
+		triangleBuffer[i].vert[0],
+		triangleBuffer[i].vert[0]);
 }
 
-void Renderer::RasterizeAndOutput(Triangle & triangle){
+void Renderer::RasterizeAndOutput(Vertex& v0, Vertex& v1, Vertex& v2){
 	//do divide
-	XMVECTOR p0 = triangle.vert[0].positionH;
-	XMVECTOR p1 = triangle.vert[1].positionH;
-	XMVECTOR p2 = triangle.vert[2].positionH;
+	XMVECTOR p0 = v0.positionH;
+	XMVECTOR p1 = v1.positionH;
+	XMVECTOR p2 = v2.positionH;
 	XMVECTOR zz = { 1.0f / p0.m128_f32[3], 1.0f / p1.m128_f32[3], 1.0f / p2.m128_f32[3] };
 	p0 = XMVectorScale(p0, zz.m128_f32[0]);
 	p1 = XMVectorScale(p1, zz.m128_f32[1]);
 	p2 = XMVectorScale(p2, zz.m128_f32[2]);
 	
 #ifdef CULL_BACK
-	XMVECTOR v0 = XMVectorSubtract(p1, p0);
-	XMVECTOR v1 = XMVectorSubtract(p2, p1);
-	XMVECTOR cross = XMVector3Cross(v0, v1);
+	XMVECTOR vec0 = XMVectorSubtract(p1, p0);
+	XMVECTOR vec1 = XMVectorSubtract(p2, p1);
+	XMVECTOR cross = XMVector3Cross(vec0, vec1);
 	if (cross.m128_f32[2] >= 0) return;
 #endif // CULL_BACK
 
 #ifdef CULL_FRONT
-	XMVECTOR v0 = XMVectorSubtract(p1, p0);
-	XMVECTOR v1 = XMVectorSubtract(p2, p1);
-	XMVECTOR cross = XMVector3Cross(v0, v1);
+	XMVECTOR vec0 = XMVectorSubtract(p1, p0);
+	XMVECTOR vec1 = XMVectorSubtract(p2, p1);
+	XMVECTOR cross = XMVector3Cross(vec0, vec1);
 	if (cross.m128_f32[2] <= 0) return;
 #endif // CULL_BACK
 
@@ -272,24 +290,24 @@ void Renderer::RasterizeAndOutput(Triangle & triangle){
 	float zybase = XMVector3Dot(abcybase, zvec).m128_f32[0], zx = zybase;
 	float zdx = XMVector3Dot(zvec, a).m128_f32[0], zdy = XMVector3Dot(zvec, b).m128_f32[0];
 	XMMATRIX pos, normal, uv, rgb;
-	pos.r[0] = triangle.vert[0].position;
-	pos.r[1] = triangle.vert[1].position;
-	pos.r[2] = triangle.vert[2].position;
+	pos.r[0] = v0.position;
+	pos.r[1] = v1.position;
+	pos.r[2] = v2.position;
 	pos.r[3] = { { 0, 0, 0, 0 } };
 
-	normal.r[0] = triangle.vert[0].normal;
-	normal.r[1] = triangle.vert[1].normal;
-	normal.r[2] = triangle.vert[2].normal;
+	normal.r[0] = v0.normal;
+	normal.r[1] = v1.normal;
+	normal.r[2] = v2.normal;
 	normal.r[3] = { { 0, 0, 0, 0 } };
 
-	uv.r[0] = triangle.vert[0].uv;
-	uv.r[1] = triangle.vert[1].uv;
-	uv.r[2] = triangle.vert[2].uv;
+	uv.r[0] = v0.uv;
+	uv.r[1] = v1.uv;
+	uv.r[2] = v2.uv;
 	uv.r[3] = { { 0, 0, 0, 0 } };
 
-	rgb.r[0] = triangle.vert[0].pcolor;
-	rgb.r[1] = triangle.vert[1].pcolor;
-	rgb.r[2] = triangle.vert[2].pcolor;
+	rgb.r[0] = v0.pcolor;
+	rgb.r[1] = v1.pcolor;
+	rgb.r[2] = v2.pcolor;
 	rgb.r[3] = { { 0, 0, 0, 0 } };
 	XMVECTOR abczBasey =	XMVectorMultiply(abcybase, zz);
 	XMVECTOR za =			XMVectorMultiply(a, zz),zb = XMVectorMultiply(b, zz);
@@ -636,26 +654,26 @@ void Renderer::RasterizeLine(int sy, int ey){
 	
 }
 
-void Renderer::RasterizeMultiThread(Triangle&triangle){
+void Renderer::RasterizeMultiThread(Vertex& v0, Vertex& v1, Vertex& v2){
 	//////////////////////init mutl thread data///////////////////////////////////
-	XMVECTOR p0 = triangle.vert[0].positionH;
-	XMVECTOR p1 = triangle.vert[1].positionH;
-	XMVECTOR p2 = triangle.vert[2].positionH;
+	XMVECTOR p0 = v0.positionH;
+	XMVECTOR p1 = v1.positionH;
+	XMVECTOR p2 = v2.positionH;
 	XMVECTOR zz = { 1.0f / p0.m128_f32[3], 1.0f / p1.m128_f32[3], 1.0f / p2.m128_f32[3] };
 	p0 = XMVectorScale(p0, zz.m128_f32[0]);
 	p1 = XMVectorScale(p1, zz.m128_f32[1]);
 	p2 = XMVectorScale(p2, zz.m128_f32[2]);
 	XMVECTOR zvec = { p0.m128_f32[2] * 65535, p0.m128_f32[2] * 65535, p2.m128_f32[2] * 65535 };
 #ifdef CULL_BACK
-	XMVECTOR v0 = XMVectorSubtract(p1, p0);
-	XMVECTOR v1 = XMVectorSubtract(p2, p1);
-	XMVECTOR cross = XMVector3Cross(v0, v1);
+	XMVECTOR vec0 = XMVectorSubtract(p1, p0);
+	XMVECTOR vec1 = XMVectorSubtract(p2, p1);
+	XMVECTOR cross = XMVector3Cross(vec0, vec1);
 	if (cross.m128_f32[2] >= 0) return;
 #endif // CULL_BACK
 #ifdef CULL_FRONT
-	XMVECTOR v0 = XMVectorSubtract(p1, p0);
-	XMVECTOR v1 = XMVectorSubtract(p2, p1);
-	XMVECTOR cross = XMVector3Cross(v0, v1);
+	XMVECTOR vec0 = XMVectorSubtract(p1, p0);
+	XMVECTOR vec1 = XMVectorSubtract(p2, p1);
+	XMVECTOR cross = XMVector3Cross(vec0, vec1);
 	if (cross.m128_f32[2] <= 0) return;
 #endif // CULL_BACK
 
@@ -696,24 +714,24 @@ void Renderer::RasterizeMultiThread(Triangle&triangle){
 	int dx = maxx - minx, dy = maxy - miny;
 	if (dy <= 0 || dx <= 0) return;
 	XMMATRIX pos, normal, uv, rgb;
-	pos.r[0] = triangle.vert[0].position;
-	pos.r[1] = triangle.vert[1].position;
-	pos.r[2] = triangle.vert[2].position;
+	pos.r[0] = v0.position;
+	pos.r[1] = v1.position;
+	pos.r[2] = v2.position;
 	pos.r[3] = { { 0, 0, 0, 0 } };
 
-	normal.r[0] = triangle.vert[0].normal;
-	normal.r[1] = triangle.vert[1].normal;
-	normal.r[2] = triangle.vert[2].normal;
+	normal.r[0] = v0.normal;
+	normal.r[1] = v1.normal;
+	normal.r[2] = v2.normal;
 	normal.r[3] = { { 0, 0, 0, 0 } };
 
-	uv.r[0] = triangle.vert[0].uv;
-	uv.r[1] = triangle.vert[1].uv;
-	uv.r[2] = triangle.vert[2].uv;
+	uv.r[0] = v0.uv;
+	uv.r[1] = v1.uv;
+	uv.r[2] = v2.uv;
 	uv.r[3] = { { 0, 0, 0, 0 } };
 
-	rgb.r[0] = triangle.vert[0].pcolor;
-	rgb.r[1] = triangle.vert[1].pcolor;
-	rgb.r[2] = triangle.vert[2].pcolor;
+	rgb.r[0] = v0.pcolor;
+	rgb.r[1] = v1.pcolor;
+	rgb.r[2] = v2.pcolor;
 	rgb.r[3] = { { 0, 0, 0, 0 } };
 
 	abcybase = { {
@@ -771,5 +789,8 @@ void Renderer::RasterizeMultiThread(Triangle&triangle){
 }
 
 void Renderer::RasterizeMultiThreadIndexed(int i){
-	RasterizeMultiThread(triangleBuffer[i]);
+	RasterizeMultiThread(
+		triangleBuffer[i].vert[0],
+		triangleBuffer[i].vert[0],
+		triangleBuffer[i].vert[0]);
 }
