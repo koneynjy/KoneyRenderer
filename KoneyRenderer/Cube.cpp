@@ -81,6 +81,9 @@ void CubeApp::updateScene(float dt)
 	if (GetAsyncKeyState('S') & 0x8000)	mPhi += 1.0f*dt;
 	if (GetAsyncKeyState('Z') & 0x8000) mlength -= 1.0f*dt;
 	if (GetAsyncKeyState('X') & 0x8000) mlength += 1.0f*dt;
+
+	if (GetAsyncKeyState('Q') & 0x8000) renderer.lightColor = XMVectorSubtract(renderer.lightColor, { { 0.01f, 0.01f, 0.01f, 0.01f } });
+	if (GetAsyncKeyState('E') & 0x8000) renderer.lightColor = XMVectorAdd(renderer.lightColor, { {0.01f,0.01f,0.01f,0.01f} });
 	//sprintf(chInput, "length:%f theta:%f phi:%f\n", mlength, mTheta, mPhi);
 	//OutputDebugStringA(chInput);
  	

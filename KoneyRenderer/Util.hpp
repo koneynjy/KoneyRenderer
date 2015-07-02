@@ -2,11 +2,6 @@
 #define _UTIL
 
 #include "DirectXMath.h"
-#define INTRIANGLE(x)				\
-	(x.m128_f32[0] >= -IMGEPS &&		\
-	 x.m128_f32[1] >= -IMGEPS &&		\
-	 x.m128_f32[2] >= -IMGEPS )
-
 
 __forceinline float f12(float dx, float dy, float dxy, float x, float y){
 	return dy * x - dx * y + dxy;
@@ -34,6 +29,7 @@ const int lutSize = 0x10000;
 const float lutsf = lutSize - 1;
 float pLUT[lutSize + 1];
 float gLUT[lutSize + 1];
+unsigned char gammaLUT[0x10000];
 
 void initLUT(int n){
 	float dy = 1.0f / lutSize, dx = 0.0f;
@@ -41,24 +37,48 @@ void initLUT(int n){
 		pLUT[i] = quickPow(dx, n);
 		dx += dy;
 	}
+
 	dy = 1.0f / lutSize, dx = 0.0f;
 	for (int i = 0; i <= lutSize; i++){
-		gLUT[i] = powf(dx, 0.45f);
+		gammaLUT[i] = unsigned char (powf(dx, 0.45f) * 255.0f);
 		dx += dy;
 	}
 }
+
 
 __forceinline float lutPow(float a, int b){
 	return pLUT[int(a * lutsf)];
 }
 
-__forceinline DirectX::XMVECTOR GammaCorrect(DirectX::XMVECTOR &v){
-	DirectX::XMVECTOR t = DirectX::XMVectorScale(v, lutsf);
-	v.m128_f32[0] = gLUT[int(t.m128_f32[0])];
-	v.m128_f32[1] = gLUT[int(t.m128_f32[1])];
-	v.m128_f32[2] = gLUT[int(t.m128_f32[2])];
-	return v;
+__forceinline int GammaCorrect(DirectX:: XMVECTOR &c){
+	DirectX::XMVECTOR cf = DirectX::XMVectorScale(c, lutsf);
+	return	gammaLUT[int(cf.m128_f32[2])] |
+		(gammaLUT[int(cf.m128_f32[1])] << 8) |
+		(gammaLUT[int(cf.m128_f32[0])] << 16);
 }
+
+__forceinline float Q_rsqrt(float number)
+{
+	long i;
+	float x2, y;
+	const float threehalfs = 1.5F;
+
+	x2 = number * 0.5F;
+	y = number;
+	i = *(long *)&y;                       // evil floating point bit level hacking（对浮点数的邪恶位级hack）
+	i = 0x5f375a86 - (i >> 1);               // what the fuck?（这他妈的是怎么回事？）
+	y = *(float *)&i;
+	y = y * (threehalfs - (x2 * y * y));   // 1st iteration （第一次牛顿迭代）
+//	y  = y * ( threehalfs - ( x2 * y * y ) );   // 2nd iteration, this can be removed（第二次迭代，可以删除）
+	return y;
+}
+
+__forceinline DirectX::XMVECTOR QuickNormalize(DirectX::XMVECTOR& v){
+	return DirectX::XMVectorScale(v, Q_rsqrt(DirectX::XMVector3Dot(v, v).m128_f32[0]));
+}
+
+
+
 
 // inline void genCoe(float tmp,
 // 	float dx, float dy, float dxy,

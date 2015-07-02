@@ -4,6 +4,11 @@
 #include <assert.h>
 using namespace DirectX;
 
+#define INTRIANGLE(x)				\
+	( x.m128_f32[0] >= -IMGEPS &&	\
+	  x.m128_f32[1] >= -IMGEPS &&	\
+	  x.m128_f32[2] >= -IMGEPS )
+
 __forceinline void lerpVert(Vertex& v, Vertex & v0, Vertex& v1, float t, float mt){
 	v.positionH = XMVectorAdd(XMVectorScale(v0.positionH, mt), XMVectorScale(v1.positionH, t));
 	v.position = XMVectorAdd(XMVectorScale(v0.position, mt), XMVectorScale(v1.position, t));
@@ -19,7 +24,7 @@ Renderer::Renderer() :fbdata(NULL), zbuffer(NULL){
 	aColor = { { 0.05f, 0.05f, 0.05f } };
 	eyePos;
 	spec = { { 1.0f, 1.0f, 1.0f } };
-	colorOverRide = { { 0.5f, 0.5f, 0.5f, 0.0f } };
+	colorOverRide = { { 0.8f, 0.0f, 0.0f, 0.0f } };
 #ifdef GAMMACORRECT
 	colorOverRide = XMVectorPow(colorOverRide, { {2.2f,2.2f,2.2f,2.2f} });
 #endif
@@ -60,7 +65,11 @@ __forceinline XMVECTOR Renderer::lightShader(Vertex& vert){
 	XMVECTOR color = vert.color;
 	XMVECTOR lightc = lightColor;
 #ifdef POINTLIGHT
+#ifdef BLINNPHONG
+	XMVECTOR l = XMVector3NormalizeEst(XMVectorSubtract(lightPoint, pos));
+#else
 	XMVECTOR l = XMVector3Normalize(XMVectorSubtract(lightPoint, pos));
+#endif
 #else
 	XMVECTOR l = XMLoadFloat3(&light);
 #endif
@@ -69,26 +78,22 @@ __forceinline XMVECTOR Renderer::lightShader(Vertex& vert){
 	diffuse = XMVectorAdd(XMVectorScale(lightc, diff), aColor);
 
 #ifdef SPECULAR
+#ifdef BLINNPHONG
+	XMVECTOR h = XMVector3Normalize(XMVectorAdd(XMVector3NormalizeEst(XMVectorSubtract(eyePos, pos)), l));
+	float sp = XMVector3Dot(h, normal).m128_f32[0];
+#else
 	XMVECTOR r = XMVector3Reflect(XMVector3Normalize(XMVectorSubtract(pos, eyePos)), normal);
 	float sp = XMVector3Dot(l, r).m128_f32[0];
+#endif // BLINNPHONG
 	if (sp > EPS){
 		XMVECTOR specular = XMVectorScale(spec, lutPow(sp, n));
 		specular = XMVectorMultiply(lightc, specular);
-#ifdef GAMMACORRECT
-		//XMVectorSqrt
-		return GammaCorrect(XMVectorSaturate(XMVectorAdd(specular, XMVectorMultiply(diffuse, color))));
-#else
+		XMVectorSaturate(XMVectorAdd(specular, XMVectorMultiply(diffuse, color)));
 		return XMVectorSaturate(XMVectorAdd(specular, XMVectorMultiply(diffuse, color)));
-#endif	
 	}
 	else{
-#ifdef GAMMACORRECT
-		return GammaCorrect(XMVectorSaturate(XMVectorMultiply(diffuse, color)));
-#else
 		return XMVectorSaturate(XMVectorMultiply(diffuse, color));
-#endif
 	}
-	
 #else
 	return XMVectorSaturate(XMVectorMultiply(diffuse, color));
 #endif
@@ -145,11 +150,16 @@ __forceinline void Renderer::OutputMerge(XMVECTOR c, unsigned short z, int x, in
 #ifdef ZWRITE
 	zbuffer[idx] = z;
 #endif
+#ifdef GAMMACORRECT
+	fbdata[idx] = GammaCorrect(c);
+#else
 	unsigned char red, green, blue, alpha;
-	red =	c.m128_f32[0] * 255;
-	green = c.m128_f32[1] * 255;
-	blue =	c.m128_f32[2] * 255;	
+	XMVECTOR cf = XMVectorScale(c, 255.0f);
+	red = cf.m128_f32[0];
+	green = cf.m128_f32[1];
+	blue = cf.m128_f32[2];
 	fbdata[idx] = blue | (green << 8) | (red << 16);
+#endif
 }
 
 void Renderer::Render(){
@@ -204,9 +214,13 @@ void Renderer::ClippNearRasterization(Vertex& v0, Vertex& v1, Vertex& v2){
 		lerpVert(vertex[vcnt++], v2, v0, t, 1.0f - t);
 	}
 	if (!vcnt) return;
+#ifdef MULTITHREAD
 	RasterizeMultiThread(vertex[0], vertex[1], vertex[2]);
 	if (vcnt == 4) RasterizeMultiThread(vertex[0], vertex[2], vertex[3]);
-
+#else
+	RasterizeAndOutput(vertex[0], vertex[1], vertex[2]);
+	if (vcnt == 4) RasterizeAndOutput(vertex[0], vertex[2], vertex[3]);
+#endif
 }
 
 void Renderer::RasterizeAndOutputIndexed(int i){
@@ -620,7 +634,6 @@ void Renderer::RasterizeLine(int sy, int ey){
 					tvert.position = XMVectorScale(posX, scale);
 					tvert.normal = XMVectorScale(normalX, scale);
 #endif
-					//zx = XMVector3Dot(abcx, zvec).m128_f32[0];
 					OutputMerge(PixelShader(tvert, scale), zx, j, i);
 				//}
 				//OutputMerge(texture.BilinearSampler(tvert.uv), zx, j, i);
